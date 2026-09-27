@@ -10,7 +10,8 @@
 #   layout            "name start_lba sectors" for every v2 partition
 #   loader.itb        our U-Boot as a FIT for the stock U-Boot (-> 0:HLOS)
 #   bootbackup.tar    stock boot data (-> bootbackup)
-#   slot.itb          OpenWrt slot image, metadata stripped (-> fit_a)
+#   slot.itb          OpenWrt slot image, metadata stripped (-> fit_a; the
+#                     rest of fit_a becomes that slot's overlay, /dev/fitrw)
 #
 #   qhora-install.sh <bundle dir> [--yes]
 #
@@ -83,7 +84,7 @@ else
 fi
 
 part() { awk -v n="$1" '$1 == n { print $2, $3 }' layout; }
-for name in 0:HLOS ubootenv bootbackup fit_a fit_b rootfs_data; do
+for name in 0:HLOS ubootenv bootbackup fit_a fit_b data; do
 	[ -n "$(part "$name")" ] || die "layout has no $name"
 done
 fits() { # file, partition name
@@ -111,13 +112,18 @@ zero_part_head() { # partition name, sectors
 	set -- "$1" "$2" $(part "$1")
 	dd_q if=/dev/zero of="$disk" bs=512 seek="$3" count="$2" conv=notrunc,fsync
 }
+zero_after() { # file, partition name, sectors: clear what follows the file
+	set -- "$1" "$2" "$3" $(part "$2")
+	dd_q if=/dev/zero of="$disk" bs=512 seek=$(( $4 + ($(wc -c < "$1") + 511) / 512 )) count="$3" conv=notrunc,fsync
+}
 
 write_part bootbackup.tar bootbackup;	checkpoint "stock boot data -> bootbackup"
 write_part loader.itb 0:HLOS;		checkpoint "U-Boot loader -> 0:HLOS"
-write_part slot.itb fit_a;		checkpoint "OpenWrt -> fit_a"
+write_part slot.itb fit_a
+zero_after slot.itb fit_a 2048;		checkpoint "OpenWrt -> fit_a, its overlay area cleared"
 zero_part_head fit_b 2048;		checkpoint "fit_b cleared"
 zero_part_head ubootenv 2048;		checkpoint "ubootenv cleared (U-Boot uses its defaults)"
-zero_part_head rootfs_data 2048;	checkpoint "rootfs_data cleared (fresh overlay)"
+zero_part_head data 2048;		checkpoint "data cleared"
 
 dd_q if=gpt.backup.bin of="$disk" bs=512 seek=$((sectors - 33)) conv=notrunc,fsync
 checkpoint "new backup GPT"

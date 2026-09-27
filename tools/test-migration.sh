@@ -86,7 +86,7 @@ echo "$out" | grep -q "converted to layout v2" && ok "conversion completes" || {
 v=$(c "sgdisk -v /work/$T/disk.img 2>&1" || true)
 echo "$v" | grep -q "No problems found" && ok "sgdisk: converted table is valid" || { bad "sgdisk verify"; echo "$v"; }
 c "cd /work/$T && sfdisk -d disk.img" > "$T/converted.sfdisk"
-for n in 0:HLOS ubootenv bootbackup fit_a fit_b rootfs_data; do
+for n in 0:HLOS ubootenv bootbackup fit_a fit_b data; do
 	grep -q "name=\"$n\"" "$T/converted.sfdisk" || bad "partition $n missing after conversion"
 done
 cmpart() { # file, partition name

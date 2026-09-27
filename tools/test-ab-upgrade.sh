@@ -32,10 +32,11 @@ scenario() { # name, initial boot_slot, write_ok(1/0), keep_settings(1/0), expec
 			echo "write $EMMC_KERN_DEV" >> $T/log
 			[ "$WRITE_OK" = 1 ] && export EMMC_KERNEL_BLOCKS=1234 || export EMMC_KERNEL_BLOCKS=
 		}
-		emmc_copy_config() { echo "copy config to $EMMC_DATA_DEV" >> $T/log; }
+		emmc_copy_config() { echo "copy config after the FIT in $EMMC_KERN_DEV, EMMC_DATA_DEV=${EMMC_DATA_DEV:-unset}" >> $T/log; }
 		dd() { echo "dd $*" >> $T/log; }
 		sync() { :; }
 		[ "$KEEP" = 1 ] && export UPGRADE_BACKUP=/tmp/sysupgrade.tgz || unset UPGRADE_BACKUP
+		export EMMC_DATA_DEV=/dev/stale-from-elsewhere
 		platform_do_upgrade /tmp/image.itb > $T/out 2>&1
 		echo "rc=$?" >> $T/log
 	) || true
@@ -52,8 +53,8 @@ scenario() { # name, initial boot_slot, write_ok(1/0), keep_settings(1/0), expec
 }
 
 export WRITE_OK KEEP
-WRITE_OK=1 KEEP=1 scenario "a running, keep settings -> write b"  a 1 1 "write /dev/fake-fit_b" "copy config to /dev/fake-rootfs_data" "boot_slot=b" "upgrade_available=1" "bootcount=0" "rc=0"
-WRITE_OK=1 KEEP=0 scenario "b running, no settings -> write a"    b 1 0 "write /dev/fake-fit_a" "dd if=/dev/zero of=/dev/fake-rootfs_data" "boot_slot=a" "!copy config" "rc=0"
+WRITE_OK=1 KEEP=1 scenario "a running, keep settings -> write b"  a 1 1 "write /dev/fake-fit_b" "copy config after the FIT in /dev/fake-fit_b, EMMC_DATA_DEV=unset" "boot_slot=b" "upgrade_available=1" "bootcount=0" "rc=0"
+WRITE_OK=1 KEEP=0 scenario "b running, no settings -> write a"    b 1 0 "write /dev/fake-fit_a" "boot_slot=a" "!copy config" "!stale-from-elsewhere" "rc=0"
 WRITE_OK=0 KEEP=1 scenario "write fails -> no switch"             a 0 1 "write /dev/fake-fit_b" "!setenv" "!copy config" "!rc=0"
 WRITE_OK=1 KEEP=1 scenario "boot_slot unset -> refuse"            "" 1 1 "!write" "!setenv" "!rc=0"
 WRITE_OK=1 KEEP=1 scenario "boot_slot garbage -> refuse"          x 1 1 "!write" "!setenv" "!rc=0"

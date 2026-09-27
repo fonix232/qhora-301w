@@ -1,4 +1,4 @@
-From 20f2d4b0abe26934d56d475bda9d6e79d52fdcd1 Mon Sep 17 00:00:00 2001
+From 46c3de689bf82c6e294dc1951b8ad02b454e6838 Mon Sep 17 00:00:00 2001
 From: Jozsef Kiraly <fonix232@gmail.com>
 Date: Sun, 27 Sep 2026 05:21:58 +0100
 Subject: [PATCH 3/3] qualcommax: ipq807x: add QNAP 301w (OpenWrt U-Boot
@@ -6,23 +6,24 @@ Subject: [PATCH 3/3] qualcommax: ipq807x: add QNAP 301w (OpenWrt U-Boot
 
 A second variant of the QNAP 301w for units whose eMMC has been
 converted to the OpenWrt U-Boot layout: our U-Boot (chainloaded from the
-stock one, later in place of it), two firmware slots and one shared
-overlay partition:
+stock one, later in place of it) and two firmware slots, each holding a
+FIT and, after it, that slot's own overlay:
 
   0:HLOS       4 MiB   U-Boot loader FIT (chainload stage)
   ubootenv     1 MiB   U-Boot environment, two redundant copies
   bootbackup   4 MiB   stock boot data, not touched by OpenWrt
-  fit_a      128 MiB   slot A: FIT with kernel, DTB and squashfs
-  fit_b      128 MiB   slot B
-  rootfs_data  rest    overlay (f2fs)
+  fit_a      512 MiB   slot A: FIT (kernel, DTB, squashfs), then overlay
+  fit_b      512 MiB   slot B
+  data         rest    shared storage, not an overlay
 
 The slot FITs carry the squashfs as external data and are mounted with
-fitblk; U-Boot selects the root partition by copying /chosen/rootdisk-a
-or rootdisk-b to /chosen/rootdisk. A sysupgrade writes the slot that is
-not running, carries the settings into rootfs_data, and only then
+fitblk, which maps the rest of the slot as /dev/fitrw for fstools'
+overlay. U-Boot selects the slot by copying /chosen/rootdisk-a or
+rootdisk-b to /chosen/rootdisk. A sysupgrade writes the slot that is not
+running, puts the settings into that slot's overlay area, and only then
 switches boot_slot; U-Boot's boot counter falls back to the previous
-slot if the new one does not come up, and the bootcount init script
-marks a successful boot.
+slot, with its own untouched overlay, if the new one does not come up,
+and the bootcount init script marks a successful boot.
 
 Images use configuration config@hk01 so that the stock U-Boot can boot
 them too (recovery). Enable CONFIG_UIMAGE_FIT_BLK for the target.
@@ -209,7 +210,7 @@ index e7c20493b6..7daffdaabb 100755
  	esac
  }
 diff --git a/target/linux/qualcommax/ipq807x/base-files/lib/upgrade/platform.sh b/target/linux/qualcommax/ipq807x/base-files/lib/upgrade/platform.sh
-index b9a25bc7b2..00cf463966 100644
+index b9a25bc7b2..f3b542755b 100644
 --- a/target/linux/qualcommax/ipq807x/base-files/lib/upgrade/platform.sh
 +++ b/target/linux/qualcommax/ipq807x/base-files/lib/upgrade/platform.sh
 @@ -146,6 +146,55 @@ linksys_mx_pre_upgrade() {
@@ -217,9 +218,11 @@ index b9a25bc7b2..00cf463966 100644
  }
  
 +# QNAP 301w in the OpenWrt U-Boot layout: two firmware slots (GPT fit_a and
-+# fit_b) and one shared rootfs_data. Write the slot that isn't running, then
-+# tell U-Boot to boot it. U-Boot verifies the slot before booting and falls
-+# back to the other one if it doesn't come up (bootcount, bootlimit).
++# fit_b), each holding a FIT and, after it, that slot's own overlay (fitblk
++# maps it as /dev/fitrw). Write the slot that isn't running, put the settings
++# into its overlay, then tell U-Boot to boot it. U-Boot verifies the slot
++# before booting and falls back to the other one, with its own untouched
++# overlay, if the new one doesn't come up (bootcount, bootlimit).
 +qnap_301w_ab_upgrade() {
 +	local current next
 +
@@ -234,11 +237,12 @@ index b9a25bc7b2..00cf463966 100644
 +	esac
 +
 +	export EMMC_KERN_DEV="$(find_mmc_part "fit_$next")"
-+	export EMMC_DATA_DEV="$(find_mmc_part rootfs_data)"
-+	if [ -z "$EMMC_KERN_DEV" ] || [ -z "$EMMC_DATA_DEV" ]; then
-+		echo "cannot find fit_$next or rootfs_data"
++	[ -n "$EMMC_KERN_DEV" ] || {
++		echo "cannot find partition fit_$next"
 +		return 1
-+	fi
++	}
++	# settings go right after the FIT (emmc_copy_config), not elsewhere
++	unset EMMC_DATA_DEV EMMC_ROOT_DEV
 +
 +	echo "writing slot $next ($EMMC_KERN_DEV), running slot is $current"
 +	emmc_do_upgrade "$1"
@@ -247,12 +251,9 @@ index b9a25bc7b2..00cf463966 100644
 +		return 1
 +	}
 +
-+	# Settings: carry them over into the shared overlay, or start empty.
-+	if [ -n "$UPGRADE_BACKUP" ]; then
-+		emmc_copy_config
-+	else
-+		dd if=/dev/zero of="$EMMC_DATA_DEV" bs=512 count=8
-+	fi
++	# Settings: into the new slot's overlay area, right after the FIT.
++	# Without them, emmc_upgrade_fit has already cleared that area.
++	[ -n "$UPGRADE_BACKUP" ] && emmc_copy_config
 +	sync
 +
 +	# Switch only after the slot and the settings are in place.
