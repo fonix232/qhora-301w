@@ -20,6 +20,7 @@
 *.zst
 
 .DS_Store
+.pio/
 __pycache__/
 
 # Working trees of upstream projects we patch (patch series are exported to patches/)

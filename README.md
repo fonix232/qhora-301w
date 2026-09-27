@@ -31,6 +31,7 @@ A modern boot stack for the QNAP QHora-301W: a new U-Boot, a re-partitioned eMMC
 - `tools/installer/`, `tools/mkbundle.sh`: the migration installer, its per-unit bundle, and the stock-U-Boot fallback script.
 - `tools/gpt.py`, `layouts/`: byte-exact GPT tables for the stock and v2 layouts.
 - `tools/analyze-boot.py`: boot-chain and NOR-dump analyser.
+- `tools/esp32s3-uart-bridge/`: PlatformIO firmware that turns a Waveshare ESP32-S3-Zero into a USB serial adapter that finds the RX pin and baud rate by itself.
 
 ## Offline checks
 
@@ -44,5 +45,6 @@ Run these after changing anything they cover; none needs the device.
 | `tools/test-stock-fallback.sh` | stock U-Boot level-1 fallback env script (7 checks) |
 | `tools/check-openwrt-dts.sh` | both OpenWrt 301w device trees compile, no new dtc warnings |
 | `python3 tools/mkmbn.py verify cache/vendor/nbg7815/*.mbn` | MBN hash-table generator against QCA's own images |
+| `tools/esp32s3-uart-bridge/README.md` (host test command) | serial bridge baud/pin detection against synthesised 8N1 (44 checks) |
 - Agents in `.ai/agents/`: `safety-reviewer`, `uboot-engineer`, `kernel-engineer`, `openwrt-integrator`.
 - Skills in `.ai/skills/`: `device-safety`, `forum-sync`.
