@@ -1,0 +1,145 @@
+From dbff20f558f0542ccd10fc668cb689de6906c146 Mon Sep 17 00:00:00 2001
+From: Jozsef Kiraly <fonix232@gmail.com>
+Date: Sun, 27 Sep 2026 05:48:55 +0100
+Subject: [PATCH 7/9] clk: qcom: ipq8074: add USB clocks, resets and GDSCs
+
+Describe what the two DWC3 USB controllers and their QUSB2 PHYs need:
+the AXI, master, sleep, mock UTMI and PHY config AHB clocks, the
+133.33 MHz master and 19.2 MHz UTMI rates the device tree assigns, the
+controller and PHY block resets, and the USB0/USB1 GDSCs, which report
+their state in GDSCR. Offsets from Linux drivers/clk/qcom/gcc-ipq8074.c.
+---
+ drivers/clk/qcom/clock-ipq8074.c | 71 ++++++++++++++++++++++++++++++++
+ 1 file changed, 71 insertions(+)
+
+diff --git a/drivers/clk/qcom/clock-ipq8074.c b/drivers/clk/qcom/clock-ipq8074.c
+index d26f7e15dc..e7a8779e3c 100644
+--- a/drivers/clk/qcom/clock-ipq8074.c
++++ b/drivers/clk/qcom/clock-ipq8074.c
+@@ -21,10 +21,17 @@
+ #define SRC_GPLL0		(1 << 8)
+ #define SRC_GPLL2		(2 << 8)
+ #define SRC_GPLL0_DIV2		(4 << 8)
++/* the USB RCGs use different parent maps, see Linux gcc-ipq8074.c */
++#define USB_MASTER_SRC_GPLL0	(1 << 8)	/* gcc_xo_gpll0_out_main_div2_gpll0_map */
++#define USB_UTMI_SRC_XO		(0 << 8)	/* gcc_xo_gpll6_gpll0_gpll0_out_main_div2_map */
+ 
+ #define BLSP1_QUP1_SPI_APPS_CMD_RCGR	0x02024
+ #define BLSP1_UART5_APPS_CMD_RCGR	0x06034
+ #define SDCC1_APPS_CMD_RCGR		0x42004
++#define USB0_MASTER_CMD_RCGR		0x3e00c
++#define USB0_MOCK_UTMI_CMD_RCGR		0x3e020
++#define USB1_MASTER_CMD_RCGR		0x3f00c
++#define USB1_MOCK_UTMI_CMD_RCGR		0x3f020
+ 
+ static const struct freq_tbl ftbl_blsp1_qup_spi_apps_clk_src[] = {
+ 	F(960000, SRC_XO, 10, 1, 2),
+@@ -70,6 +77,17 @@ static const struct freq_tbl ftbl_sdcc_apps_clk_src[] = {
+ 	{ }
+ };
+ 
++/* Only the rates the USB nodes assign: 133.33 MHz master/AXI, 19.2 MHz UTMI */
++static const struct freq_tbl ftbl_usb_master_clk_src[] = {
++	F(133330000, USB_MASTER_SRC_GPLL0, 6, 0, 0),
++	{ }
++};
++
++static const struct freq_tbl ftbl_usb_mock_utmi_clk_src[] = {
++	F(19200000, USB_UTMI_SRC_XO, 1, 0, 0),
++	{ }
++};
++
+ static ulong ipq8074_set_rate(struct clk *clk, ulong rate)
+ {
+ 	struct msm_clk_priv *priv = dev_get_priv(clk->dev);
+@@ -91,6 +109,28 @@ static ulong ipq8074_set_rate(struct clk *clk, ulong rate)
+ 		clk_rcg_set_rate_mnd(priv->base, SDCC1_APPS_CMD_RCGR,
+ 				     freq->pre_div, freq->m, freq->n, freq->src, 8);
+ 		return freq->freq;
++	case GCC_SYS_NOC_USB0_AXI_CLK:
++	case GCC_USB0_MASTER_CLK:
++		freq = qcom_find_freq(ftbl_usb_master_clk_src, rate);
++		clk_rcg_set_rate_mnd(priv->base, USB0_MASTER_CMD_RCGR,
++				     freq->pre_div, freq->m, freq->n, freq->src, 8);
++		return freq->freq;
++	case GCC_USB0_MOCK_UTMI_CLK:
++		freq = qcom_find_freq(ftbl_usb_mock_utmi_clk_src, rate);
++		clk_rcg_set_rate_mnd(priv->base, USB0_MOCK_UTMI_CMD_RCGR,
++				     freq->pre_div, freq->m, freq->n, freq->src, 8);
++		return freq->freq;
++	case GCC_SYS_NOC_USB1_AXI_CLK:
++	case GCC_USB1_MASTER_CLK:
++		freq = qcom_find_freq(ftbl_usb_master_clk_src, rate);
++		clk_rcg_set_rate_mnd(priv->base, USB1_MASTER_CMD_RCGR,
++				     freq->pre_div, freq->m, freq->n, freq->src, 8);
++		return freq->freq;
++	case GCC_USB1_MOCK_UTMI_CLK:
++		freq = qcom_find_freq(ftbl_usb_mock_utmi_clk_src, rate);
++		clk_rcg_set_rate_mnd(priv->base, USB1_MOCK_UTMI_CMD_RCGR,
++				     freq->pre_div, freq->m, freq->n, freq->src, 8);
++		return freq->freq;
+ 	default:
+ 		return 0;
+ 	}
+@@ -102,6 +142,16 @@ static const struct gate_clk ipq8074_clks[] = {
+ 	GATE_CLK_POLLED(GCC_BLSP1_UART5_APPS_CLK, 0x0602c, BIT(0), 0x0602c),
+ 	GATE_CLK_POLLED(GCC_SDCC1_APPS_CLK, 0x42018, BIT(0), 0x42018),
+ 	GATE_CLK_POLLED(GCC_SDCC1_AHB_CLK, 0x4201c, BIT(0), 0x4201c),
++	GATE_CLK_POLLED(GCC_SYS_NOC_USB0_AXI_CLK, 0x26040, BIT(0), 0x26040),
++	GATE_CLK_POLLED(GCC_USB0_MASTER_CLK, 0x3e000, BIT(0), 0x3e000),
++	GATE_CLK_POLLED(GCC_USB0_SLEEP_CLK, 0x3e004, BIT(0), 0x3e004),
++	GATE_CLK_POLLED(GCC_USB0_MOCK_UTMI_CLK, 0x3e008, BIT(0), 0x3e008),
++	GATE_CLK_POLLED(GCC_USB0_PHY_CFG_AHB_CLK, 0x3e080, BIT(0), 0x3e080),
++	GATE_CLK_POLLED(GCC_SYS_NOC_USB1_AXI_CLK, 0x26044, BIT(0), 0x26044),
++	GATE_CLK_POLLED(GCC_USB1_MASTER_CLK, 0x3f000, BIT(0), 0x3f000),
++	GATE_CLK_POLLED(GCC_USB1_SLEEP_CLK, 0x3f004, BIT(0), 0x3f004),
++	GATE_CLK_POLLED(GCC_USB1_MOCK_UTMI_CLK, 0x3f008, BIT(0), 0x3f008),
++	GATE_CLK_POLLED(GCC_USB1_PHY_CFG_AHB_CLK, 0x3f080, BIT(0), 0x3f080),
+ };
+ 
+ static int ipq8074_enable(struct clk *clk)
+@@ -115,23 +165,44 @@ static const struct qcom_reset_map ipq8074_gcc_resets[] = {
+ 	[GCC_BLSP1_BCR] = { 0x01000 },
+ 	[GCC_BLSP1_QUP1_BCR] = { 0x02000 },
+ 	[GCC_SDCC1_BCR] = { 0x42000 },
++	[GCC_USB0_PHY_BCR] = { 0x3e034 },
++	[GCC_USB0_BCR] = { 0x3e070 },
++	[GCC_USB1_PHY_BCR] = { 0x3f034 },
++	[GCC_USB1_BCR] = { 0x3f070 },
++	[GCC_QUSB2_0_PHY_BCR] = { 0x4103c },
++	[GCC_QUSB2_1_PHY_BCR] = { 0x41040 },
++};
++
++static const struct qcom_power_map ipq8074_gdscs[] = {
++	[USB0_GDSC] = { 0x3e078, QCOM_GDSC_STATUS_IN_GDSCR },
++	[USB1_GDSC] = { 0x3f078, QCOM_GDSC_STATUS_IN_GDSCR },
+ };
+ 
+ static const phys_addr_t ipq8074_rcg_addrs[] = {
+ 	BLSP1_QUP1_SPI_APPS_CMD_RCGR,
+ 	BLSP1_UART5_APPS_CMD_RCGR,
+ 	SDCC1_APPS_CMD_RCGR,
++	USB0_MASTER_CMD_RCGR,
++	USB0_MOCK_UTMI_CMD_RCGR,
++	USB1_MASTER_CMD_RCGR,
++	USB1_MOCK_UTMI_CMD_RCGR,
+ };
+ 
+ static const char *const ipq8074_rcg_names[] = {
+ 	"BLSP1_QUP1_SPI_APPS",
+ 	"BLSP1_UART5_APPS",
+ 	"SDCC1_APPS",
++	"USB0_MASTER",
++	"USB0_MOCK_UTMI",
++	"USB1_MASTER",
++	"USB1_MOCK_UTMI",
+ };
+ 
+ static struct msm_clk_data ipq8074_gcc_data = {
+ 	.resets = ipq8074_gcc_resets,
+ 	.num_resets = ARRAY_SIZE(ipq8074_gcc_resets),
++	.power_domains = ipq8074_gdscs,
++	.num_power_domains = ARRAY_SIZE(ipq8074_gdscs),
+ 	.clks = ipq8074_clks,
+ 	.num_clks = ARRAY_SIZE(ipq8074_clks),
+ 

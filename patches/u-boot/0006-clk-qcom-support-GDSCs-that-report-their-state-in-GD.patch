@@ -1,0 +1,54 @@
+From ba83f7106e83d70bf05412468cc32ba2973cc741 Mon Sep 17 00:00:00 2001
+From: Jozsef Kiraly <fonix232@gmail.com>
+Date: Sun, 27 Sep 2026 05:48:35 +0100
+Subject: [PATCH 6/9] clk: qcom: support GDSCs that report their state in GDSCR
+
+qcom_power_set() waits for a GDSC by polling CFG_GDSCR (GDSCR + 4), as
+on recent SoCs. Older ones, such as the IPQ8074, have no CFG_GDSCR: the
+power state is PWR_ON in GDSCR itself (Linux drivers for them don't set
+POLL_CFG_GDSCR), so polling GDSCR + 4 reads an unrelated register.
+
+Add a per-GDSC flag for those and poll GDSCR's PWR_ON bit instead.
+Existing tables are unaffected.
+---
+ drivers/clk/qcom/clock-qcom.c | 6 +++++-
+ drivers/clk/qcom/clock-qcom.h | 7 +++++++
+ 2 files changed, 12 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/clk/qcom/clock-qcom.c b/drivers/clk/qcom/clock-qcom.c
+index 6b46d9db74..979c1514e8 100644
+--- a/drivers/clk/qcom/clock-qcom.c
++++ b/drivers/clk/qcom/clock-qcom.c
+@@ -527,7 +527,11 @@ static int qcom_power_set(struct power_domain *pwr, bool on)
+ 
+ 	writel(value, base + map->reg);
+ 
+-	if (on)
++	if (map->flags & QCOM_GDSC_STATUS_IN_GDSCR)
++		ret = readl_poll_timeout(base + map->reg, value,
++					 !!(value & GDSC_PWR_ON_MASK) == on,
++					 GDSC_STATUS_POLL_TIMEOUT_US);
++	else if (on)
+ 		ret = readl_poll_timeout(base + map->reg + CFG_GDSCR_OFFSET,
+ 					 value,
+ 					 (value & GDSC_POWER_UP_COMPLETE) ||
+diff --git a/drivers/clk/qcom/clock-qcom.h b/drivers/clk/qcom/clock-qcom.h
+index 3a4550d853..84bc6f24f3 100644
+--- a/drivers/clk/qcom/clock-qcom.h
++++ b/drivers/clk/qcom/clock-qcom.h
+@@ -76,8 +76,15 @@ struct qcom_reset_map {
+ 
+ struct qcom_power_map {
+ 	unsigned int reg;
++	unsigned int flags;
+ };
+ 
++/*
++ * The GDSC has no CFG_GDSCR register: its power state is PWR_ON in GDSCR
++ * itself (older SoCs; Linux gdsc drivers without POLL_CFG_GDSCR).
++ */
++#define QCOM_GDSC_STATUS_IN_GDSCR	BIT(0)
++
+ struct clk;
+ 
+ struct msm_clk_data {

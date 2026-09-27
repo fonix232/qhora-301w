@@ -1,7 +1,7 @@
 From 46863dfbd3e7d51676b9030b279426ae8ee324df Mon Sep 17 00:00:00 2001
 From: Jozsef Kiraly <fonix232@gmail.com>
 Date: Sun, 27 Sep 2026 05:07:28 +0100
-Subject: [PATCH 5/5] board: qnap: 301w: A/B boot flow with fallback and rescue
+Subject: [PATCH 5/9] board: qnap: 301w: A/B boot flow with fallback and rescue
 
 Add the board directory with the default environment and a small
 ft_system_setup() hook:

@@ -1,7 +1,7 @@
 From 01389170a8cea1b89813cec80e5f70175c1da63e Mon Sep 17 00:00:00 2001
 From: Jozsef Kiraly <fonix232@gmail.com>
 Date: Sun, 27 Sep 2026 04:33:12 +0100
-Subject: [PATCH 2/5] pinctrl: qcom: add IPQ8074 pinctrl driver
+Subject: [PATCH 2/9] pinctrl: qcom: add IPQ8074 pinctrl driver
 
 Add the TLMM pin and function tables for the IPQ8074 family (70 GPIOs,
 112 functions), generated from Linux drivers/pinctrl/qcom/pinctrl-ipq8074.c

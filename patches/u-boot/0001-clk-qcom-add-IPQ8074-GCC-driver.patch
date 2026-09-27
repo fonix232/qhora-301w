@@ -1,7 +1,7 @@
 From d4dc32f258bce4e1bc65a20e56da1a56d3a5d79a Mon Sep 17 00:00:00 2001
 From: Jozsef Kiraly <fonix232@gmail.com>
 Date: Sun, 27 Sep 2026 04:33:11 +0100
-Subject: [PATCH 1/5] clk: qcom: add IPQ8074 GCC driver
+Subject: [PATCH 1/9] clk: qcom: add IPQ8074 GCC driver
 
 Add a minimal Global Clock Controller driver for the IPQ8074 family,
 covering the clocks and resets U-Boot needs for the console UART

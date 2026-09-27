@@ -1,0 +1,24 @@
+From 10ddf4742d4d2164c0b1f820d8023cf131226f50 Mon Sep 17 00:00:00 2001
+From: Jozsef Kiraly <fonix232@gmail.com>
+Date: Sun, 27 Sep 2026 05:48:55 +0100
+Subject: [PATCH 8/9] phy: qcom: qusb2: add IPQ8074
+
+The IPQ8074 QUSB2 PHY uses the MSM8996 register layout and init table,
+as in Linux drivers/phy/qualcomm/phy-qcom-qusb2.c.
+---
+ drivers/phy/qcom/phy-qcom-qusb2.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/drivers/phy/qcom/phy-qcom-qusb2.c b/drivers/phy/qcom/phy-qcom-qusb2.c
+index 6278171b10..4a01f8b146 100644
+--- a/drivers/phy/qcom/phy-qcom-qusb2.c
++++ b/drivers/phy/qcom/phy-qcom-qusb2.c
+@@ -498,6 +498,8 @@ static struct phy_ops qusb2phy_ops = {
+ };
+ 
+ static const struct udevice_id qusb2phy_ids[] = {
++	{ .compatible = "qcom,ipq8074-qusb2-phy",
++	  .data = (ulong)&msm8996_phy_cfg },
+ 	{ .compatible = "qcom,msm8996-qusb2-phy",
+ 	  .data = (ulong)&msm8996_phy_cfg },
+ 	{ .compatible = "qcom,qusb2-phy" },

@@ -1,7 +1,7 @@
 From a4567010619ea55fe6a6e57ddb6ddbdc65302fb0 Mon Sep 17 00:00:00 2001
 From: Daniel Golle <daniel@makrotopia.org>
 Date: Sun, 27 Sep 2026 04:45:04 +0100
-Subject: [PATCH 4/5] cmd: add imsz and imszb
+Subject: [PATCH 4/9] cmd: add imsz and imszb
 
 Add commands that report the total size of a legacy or FIT image in
 memory (including FIT external data), in bytes or 512-byte blocks.

@@ -1,7 +1,7 @@
 From f4beb948e9b9045ff0b0f4bd8fa41aba72e0b8f8 Mon Sep 17 00:00:00 2001
 From: Jozsef Kiraly <fonix232@gmail.com>
 Date: Sun, 27 Sep 2026 04:33:12 +0100
-Subject: [PATCH 3/5] arm: dts: qcom: add QNAP QHora-301W
+Subject: [PATCH 3/9] arm: dts: qcom: add QNAP QHora-301W
 
 Add a board description and defconfig for the QNAP QHora-301W
 (IPQ8072A, 1 GiB RAM, 4 GB eMMC, 8 MiB SPI-NOR). The device tree is
