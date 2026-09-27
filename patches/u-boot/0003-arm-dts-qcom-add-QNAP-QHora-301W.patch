@@ -1,0 +1,226 @@
+From f4beb948e9b9045ff0b0f4bd8fa41aba72e0b8f8 Mon Sep 17 00:00:00 2001
+From: Jozsef Kiraly <fonix232@gmail.com>
+Date: Sun, 27 Sep 2026 04:33:12 +0100
+Subject: [PATCH 3/3] arm: dts: qcom: add QNAP QHora-301W
+
+Add a board description and defconfig for the QNAP QHora-301W
+(IPQ8072A, 1 GiB RAM, 4 GB eMMC, 8 MiB SPI-NOR). The device tree is
+derived from OpenWrt's ipq8072-301w.dts on top of the upstream
+ipq8074.dtsi, limited to what U-Boot drives today: UART, eMMC, LEDs
+and buttons.
+
+This first configuration is meant to be chainloaded from the stock
+QCA U-Boot (it keeps its environment in RAM and has no SPI-flash
+commands); eMMC runs at high speed only until HS200 is tested.
+---
+ arch/arm/dts/ipq8072-qnap-301w-u-boot.dtsi |  14 +++
+ arch/arm/dts/ipq8072-qnap-301w.dts         | 116 +++++++++++++++++++++
+ configs/qnap_301w_defconfig                |  55 ++++++++++
+ 3 files changed, 185 insertions(+)
+ create mode 100644 arch/arm/dts/ipq8072-qnap-301w-u-boot.dtsi
+ create mode 100644 arch/arm/dts/ipq8072-qnap-301w.dts
+ create mode 100644 configs/qnap_301w_defconfig
+
+diff --git a/arch/arm/dts/ipq8072-qnap-301w-u-boot.dtsi b/arch/arm/dts/ipq8072-qnap-301w-u-boot.dtsi
+new file mode 100644
+index 0000000000..caed012f9a
+--- /dev/null
++++ b/arch/arm/dts/ipq8072-qnap-301w-u-boot.dtsi
+@@ -0,0 +1,14 @@
++// SPDX-License-Identifier: GPL-2.0-or-later OR MIT
++/*
++ * U-Boot specific additions for the QNAP QHora-301W
++ */
++
++&sdhc_1 {
++	/*
++	 * The eMMC I/O rail is 1.8 V (PMIC LDO11, set up before U-Boot runs).
++	 * Advertise 1.8 V so the SDHCI core doesn't try to power the bus at
++	 * 3.3 V; same approach as ipq9574-rdp433-u-boot.dtsi.
++	 */
++	sdhci-caps-mask = <0x0 0x04000000>;
++	sdhci-caps = <0x0 0x04000000>;	/* SDHCI_CAN_VDD_180 */
++};
+diff --git a/arch/arm/dts/ipq8072-qnap-301w.dts b/arch/arm/dts/ipq8072-qnap-301w.dts
+new file mode 100644
+index 0000000000..38f41cc2df
+--- /dev/null
++++ b/arch/arm/dts/ipq8072-qnap-301w.dts
+@@ -0,0 +1,116 @@
++// SPDX-License-Identifier: GPL-2.0-or-later OR MIT
++/*
++ * QNAP QHora-301W
++ *
++ * Board description for U-Boot, derived from OpenWrt's
++ * target/linux/qualcommax/dts/ipq8072-301w.dts (Copyright (c) 2021,
++ * Dirk Buchwalder) on top of the upstream ipq8074.dtsi. Networking,
++ * PCIe and Wi-Fi are left out until U-Boot has drivers for them.
++ */
++
++/dts-v1/;
++
++#include "ipq8074.dtsi"
++#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/input/input.h>
++#include <dt-bindings/leds/common.h>
++
++/ {
++	model = "QNAP QHora-301W";
++	compatible = "qnap,301w", "qcom,ipq8074";
++
++	aliases {
++		serial0 = &blsp1_uart5;
++		mmc0 = &sdhc_1;
++	};
++
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
++
++	memory@40000000 {
++		device_type = "memory";
++		reg = <0x0 0x40000000 0x0 0x40000000>;
++	};
++
++	keys {
++		compatible = "gpio-keys";
++		pinctrl-0 = <&button_pins>;
++		pinctrl-names = "default";
++
++		button-wps {
++			label = "wps";
++			gpios = <&tlmm 57 GPIO_ACTIVE_LOW>;
++			linux,code = <KEY_WPS_BUTTON>;
++		};
++
++		button-reset {
++			label = "reset";
++			gpios = <&tlmm 67 GPIO_ACTIVE_LOW>;
++			linux,code = <KEY_RESTART>;
++		};
++	};
++
++	leds {
++		compatible = "gpio-leds";
++		pinctrl-0 = <&leds_pins>;
++		pinctrl-names = "default";
++
++		led_system_green: led-system-green {
++			label = "green:status";
++			gpios = <&tlmm 1 GPIO_ACTIVE_HIGH>;
++			color = <LED_COLOR_ID_GREEN>;
++			function = LED_FUNCTION_STATUS;
++		};
++
++		led_system_red: led-system-red {
++			label = "red:status";
++			gpios = <&tlmm 3 GPIO_ACTIVE_HIGH>;
++			color = <LED_COLOR_ID_RED>;
++			function = LED_FUNCTION_STATUS;
++		};
++
++		led_pwr_green: led-pwr-green {
++			label = "green:power";
++			gpios = <&tlmm 4 GPIO_ACTIVE_HIGH>;
++			color = <LED_COLOR_ID_GREEN>;
++			function = LED_FUNCTION_POWER;
++			default-state = "on";
++		};
++	};
++};
++
++&tlmm {
++	button_pins: button-state {
++		pins = "gpio57", "gpio67";
++		function = "gpio";
++		drive-strength = <8>;
++		bias-pull-up;
++	};
++
++	leds_pins: leds-state {
++		pins = "gpio1", "gpio3", "gpio4";
++		function = "gpio";
++		drive-strength = <8>;
++		bias-pull-down;
++	};
++};
++
++&blsp1_uart5 {
++	status = "okay";
++};
++
++&sdhc_1 {
++	status = "okay";
++	non-removable;
++
++	/*
++	 * QNAP's stock DTS notes that this eMMC fails the HS400 -> HS200
++	 * switch. Start U-Boot at plain high speed and add HS200 once it
++	 * has been tested on hardware.
++	 */
++	/delete-property/ mmc-hs400-1_8v;
++	/delete-property/ mmc-hs200-1_8v;
++	/delete-property/ mmc-ddr-1_8v;
++	max-frequency = <192000000>;
++};
+diff --git a/configs/qnap_301w_defconfig b/configs/qnap_301w_defconfig
+new file mode 100644
+index 0000000000..ca4c6b520e
+--- /dev/null
++++ b/configs/qnap_301w_defconfig
+@@ -0,0 +1,55 @@
++CONFIG_ARM=y
++CONFIG_SKIP_LOWLEVEL_INIT=y
++CONFIG_POSITION_INDEPENDENT=y
++CONFIG_SYS_INIT_SP_BSS_OFFSET=0x180000
++CONFIG_ARCH_SNAPDRAGON=y
++CONFIG_TEXT_BASE=0x41000000
++CONFIG_NR_DRAM_BANKS=24
++CONFIG_DEFAULT_DEVICE_TREE="ipq8072-qnap-301w"
++CONFIG_SYS_LOAD_ADDR=0x44000000
++CONFIG_DEBUG_UART_BASE=0x78b3000
++CONFIG_DEBUG_UART_CLOCK=7372800
++CONFIG_IDENT_STRING="\nQNAP QHora-301W"
++CONFIG_DEBUG_UART=y
++CONFIG_REMAKE_ELF=y
++# CONFIG_EFI_LOADER is not set
++CONFIG_FIT=y
++CONFIG_FIT_VERBOSE=y
++# CONFIG_BOOTSTD is not set
++CONFIG_OF_BOARD_SETUP=y
++CONFIG_USE_PREBOOT=y
++CONFIG_SYS_PBSIZE=1024
++# CONFIG_DISPLAY_CPUINFO is not set
++CONFIG_DISPLAY_BOARDINFO_LATE=y
++CONFIG_HUSH_PARSER=y
++CONFIG_SYS_PROMPT="301w # "
++CONFIG_CMD_MEMINFO=y
++CONFIG_CMD_CLK=y
++CONFIG_CMD_GPIO=y
++CONFIG_CMD_MMC=y
++CONFIG_CMD_PART=y
++CONFIG_CMD_EXT4=y
++CONFIG_CMD_FAT=y
++CONFIG_CMD_FS_GENERIC=y
++CONFIG_OF_LIVE=y
++# CONFIG_OF_UPSTREAM is not set
++CONFIG_BUTTON=y
++CONFIG_BUTTON_GPIO=y
++CONFIG_CLK=y
++CONFIG_CLK_QCOM_IPQ8074=y
++CONFIG_MSM_GPIO=y
++# CONFIG_I2C is not set
++# CONFIG_INPUT is not set
++CONFIG_LED=y
++CONFIG_LED_GPIO=y
++CONFIG_MISC=y
++CONFIG_MMC_SDHCI=y
++CONFIG_MMC_SDHCI_ADMA=y
++CONFIG_MMC_SDHCI_MSM=y
++CONFIG_PINCTRL=y
++CONFIG_PINCONF=y
++CONFIG_PINCTRL_QCOM_IPQ8074=y
++CONFIG_DEBUG_UART_ANNOUNCE=y
++CONFIG_DEBUG_UART_SKIP_INIT=y
++CONFIG_MSM_SERIAL=y
++CONFIG_SOC_QCOM=y
