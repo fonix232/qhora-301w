@@ -1,0 +1,280 @@
+From 20f2d4b0abe26934d56d475bda9d6e79d52fdcd1 Mon Sep 17 00:00:00 2001
+From: Jozsef Kiraly <fonix232@gmail.com>
+Date: Sun, 27 Sep 2026 05:21:58 +0100
+Subject: [PATCH 3/3] qualcommax: ipq807x: add QNAP 301w (OpenWrt U-Boot
+ layout)
+
+A second variant of the QNAP 301w for units whose eMMC has been
+converted to the OpenWrt U-Boot layout: our U-Boot (chainloaded from the
+stock one, later in place of it), two firmware slots and one shared
+overlay partition:
+
+  0:HLOS       4 MiB   U-Boot loader FIT (chainload stage)
+  ubootenv     1 MiB   U-Boot environment, two redundant copies
+  bootbackup   4 MiB   stock boot data, not touched by OpenWrt
+  fit_a      128 MiB   slot A: FIT with kernel, DTB and squashfs
+  fit_b      128 MiB   slot B
+  rootfs_data  rest    overlay (f2fs)
+
+The slot FITs carry the squashfs as external data and are mounted with
+fitblk; U-Boot selects the root partition by copying /chosen/rootdisk-a
+or rootdisk-b to /chosen/rootdisk. A sysupgrade writes the slot that is
+not running, carries the settings into rootfs_data, and only then
+switches boot_slot; U-Boot's boot counter falls back to the previous
+slot if the new one does not come up, and the bootcount init script
+marks a successful boot.
+
+Images use configuration config@hk01 so that the stock U-Boot can boot
+them too (recovery). Enable CONFIG_UIMAGE_FIT_BLK for the target.
+---
+ .../uboot-envtools/files/qualcommax_ipq807x   |  5 ++
+ target/linux/qualcommax/config-6.18           |  1 +
+ .../qualcommax/dts/ipq8072-301w-ubootmod.dts  | 44 ++++++++++++++++
+ target/linux/qualcommax/image/ipq807x.mk      | 20 +++++++
+ .../ipq807x/base-files/etc/board.d/01_leds    |  3 +-
+ .../ipq807x/base-files/etc/board.d/02_network |  3 +-
+ .../etc/hotplug.d/firmware/11-ath11k-caldata  |  1 +
+ .../ipq807x/base-files/etc/init.d/bootcount   | 10 ++++
+ .../base-files/lib/upgrade/platform.sh        | 52 +++++++++++++++++++
+ 9 files changed, 137 insertions(+), 2 deletions(-)
+ create mode 100644 target/linux/qualcommax/dts/ipq8072-301w-ubootmod.dts
+
+diff --git a/package/boot/uboot-tools/uboot-envtools/files/qualcommax_ipq807x b/package/boot/uboot-tools/uboot-envtools/files/qualcommax_ipq807x
+index 7c15a78c4f..3612c2af09 100644
+--- a/package/boot/uboot-tools/uboot-envtools/files/qualcommax_ipq807x
++++ b/package/boot/uboot-tools/uboot-envtools/files/qualcommax_ipq807x
+@@ -39,6 +39,11 @@ asus,rt-ax89x|\
+ qnap,301w)
+ 	ubootenv_add_mtd "0:appsblenv" "0x0" "0x20000" "0x20000"
+ 	;;
++qnap,301w-ubootmod)
++	# U-Boot keeps two redundant copies at the end of the partition
++	ubootenv_add_mmc "ubootenv" "" "0xe0000" "0x20000" "0x20000"
++	ubootenv_add_mmc "ubootenv" "" "0xc0000" "0x20000" "0x20000"
++	;;
+ dynalink,dl-wrx36|\
+ netgear,rax120v2|\
+ netgear,rbr750|\
+diff --git a/target/linux/qualcommax/config-6.18 b/target/linux/qualcommax/config-6.18
+index 2217e37b91..e89931e858 100644
+--- a/target/linux/qualcommax/config-6.18
++++ b/target/linux/qualcommax/config-6.18
+@@ -636,6 +636,7 @@ CONFIG_TREE_SRCU=y
+ CONFIG_UBIFS_FS=y
+ CONFIG_UBIFS_FS_ADVANCED_COMPR=y
+ # CONFIG_UCLAMP_TASK is not set
++CONFIG_UIMAGE_FIT_BLK=y
+ CONFIG_UNMAP_KERNEL_AT_EL0=y
+ CONFIG_USB=y
+ CONFIG_USB_COMMON=y
+diff --git a/target/linux/qualcommax/dts/ipq8072-301w-ubootmod.dts b/target/linux/qualcommax/dts/ipq8072-301w-ubootmod.dts
+new file mode 100644
+index 0000000000..dfa538b5e6
+--- /dev/null
++++ b/target/linux/qualcommax/dts/ipq8072-301w-ubootmod.dts
+@@ -0,0 +1,44 @@
++// SPDX-License-Identifier: GPL-2.0-or-later OR MIT
++
++/dts-v1/;
++
++#include "ipq8072-301w.dtsi"
++
++/ {
++	model = "QNAP 301w (OpenWrt U-Boot layout)";
++	compatible = "qnap,301w-ubootmod", "qcom,ipq8074";
++
++	chosen {
++		bootargs-append = " root=/dev/fit0 rootwait";
++		/*
++		 * The OpenWrt U-Boot copies the phandle of the slot it booted
++		 * (rootdisk-a or rootdisk-b) to /chosen/rootdisk for fitblk.
++		 */
++		rootdisk-a = <&emmc_fit_a>;
++		rootdisk-b = <&emmc_fit_b>;
++	};
++};
++
++&sdhc_1 {
++	#address-cells = <1>;
++	#size-cells = <0>;
++
++	card@0 {
++		compatible = "mmc-card";
++		reg = <0>;
++
++		block {
++			compatible = "block-device";
++
++			partitions {
++				emmc_fit_a: block-partition-fit-a {
++					partname = "fit_a";
++				};
++
++				emmc_fit_b: block-partition-fit-b {
++					partname = "fit_b";
++				};
++			};
++		};
++	};
++};
+diff --git a/target/linux/qualcommax/image/ipq807x.mk b/target/linux/qualcommax/image/ipq807x.mk
+index 72c1e57103..d46aa8cd08 100644
+--- a/target/linux/qualcommax/image/ipq807x.mk
++++ b/target/linux/qualcommax/image/ipq807x.mk
+@@ -452,6 +452,26 @@ define Device/qnap_301w
+ endef
+ TARGET_DEVICES += qnap_301w
+ 
++define Device/qnap_301w-ubootmod
++	DEVICE_VENDOR := QNAP
++	DEVICE_MODEL := 301w
++	DEVICE_VARIANT := (OpenWrt U-Boot layout)
++	DEVICE_DTS := ipq8072-301w-ubootmod
++	DEVICE_DTS_CONFIG := config@hk01
++	SOC := ipq8072
++	KERNEL := kernel-bin | libdeflate-gzip
++	KERNEL_INITRAMFS := kernel-bin | lzma | \
++		fit lzma $$(KDIR)/image-$$(firstword $$(DEVICE_DTS)).dtb with-initrd | pad-to 64k
++	KERNEL_INITRAMFS_SUFFIX := -recovery.itb
++	IMAGES := sysupgrade.itb
++	IMAGE_SIZE := 114688k
++	IMAGE/sysupgrade.itb := append-kernel | \
++		fit gzip $$(KDIR)/image-$$(firstword $$(DEVICE_DTS)).dtb external-static-with-rootfs | \
++		check-size | append-metadata
++	DEVICE_PACKAGES := fitblk kmod-fs-f2fs f2fs-tools ipq-wifi-qnap_301w
++endef
++TARGET_DEVICES += qnap_301w-ubootmod
++
+ define Device/redmi_ax6
+ 	$(call Device/xiaomi_ax3600)
+ 	DEVICE_VENDOR := Redmi
+diff --git a/target/linux/qualcommax/ipq807x/base-files/etc/board.d/01_leds b/target/linux/qualcommax/ipq807x/base-files/etc/board.d/01_leds
+index 665b83d56c..0685834e11 100644
+--- a/target/linux/qualcommax/ipq807x/base-files/etc/board.d/01_leds
++++ b/target/linux/qualcommax/ipq807x/base-files/etc/board.d/01_leds
+@@ -59,7 +59,8 @@ xiaomi,ax9000)
+ 	ucidef_set_led_netdev "lan3-port-link" "LAN3-PORT-LINK" "90000.mdio-1:01:green:lan" "lan3" "tx rx link_10 link_100 link_1000"
+ 	ucidef_set_led_netdev "lan4-port-link" "LAN4-PORT-LINK" "90000.mdio-1:00:green:lan" "lan4" "tx rx link_10 link_100 link_1000"
+ 	;;
+-qnap,301w)
++qnap,301w|\
++qnap,301w-ubootmod)
+ 	ucidef_set_led_netdev "lan1" "LAN1" "green:lan-1" "lan1"
+ 	ucidef_set_led_netdev "lan2" "LAN2" "green:lan-2" "lan2"
+ 	ucidef_set_led_netdev "lan3" "LAN3" "green:lan-3" "lan3"
+diff --git a/target/linux/qualcommax/ipq807x/base-files/etc/board.d/02_network b/target/linux/qualcommax/ipq807x/base-files/etc/board.d/02_network
+index de072424fe..a0aa3bb250 100644
+--- a/target/linux/qualcommax/ipq807x/base-files/etc/board.d/02_network
++++ b/target/linux/qualcommax/ipq807x/base-files/etc/board.d/02_network
+@@ -68,7 +68,8 @@ ipq807x_setup_interfaces()
+ 	netgear,wax630)
+ 		ucidef_set_interface_lan "lan1 lan2" "dhcp"
+ 		;;
+-	qnap,301w)
++	qnap,301w|\
++	qnap,301w-ubootmod)
+ 		ucidef_set_interfaces_lan_wan "lan1 lan2 lan3 lan4 10g-2" "10g-1"
+ 		;;
+ 	tplink,eap620hd-v1|\
+diff --git a/target/linux/qualcommax/ipq807x/base-files/etc/hotplug.d/firmware/11-ath11k-caldata b/target/linux/qualcommax/ipq807x/base-files/etc/hotplug.d/firmware/11-ath11k-caldata
+index 5ed4b86871..d40f6c23d1 100644
+--- a/target/linux/qualcommax/ipq807x/base-files/etc/hotplug.d/firmware/11-ath11k-caldata
++++ b/target/linux/qualcommax/ipq807x/base-files/etc/hotplug.d/firmware/11-ath11k-caldata
+@@ -30,6 +30,7 @@ case "$FIRMWARE" in
+ 	linksys,mx5300|\
+ 	netgear,wax218|\
+ 	qnap,301w|\
++	qnap,301w-ubootmod|\
+ 	redmi,ax6|\
+ 	xiaomi,ax3600|\
+ 	xiaomi,ax9000|\
+diff --git a/target/linux/qualcommax/ipq807x/base-files/etc/init.d/bootcount b/target/linux/qualcommax/ipq807x/base-files/etc/init.d/bootcount
+index e7c20493b6..7daffdaabb 100755
+--- a/target/linux/qualcommax/ipq807x/base-files/etc/init.d/bootcount
++++ b/target/linux/qualcommax/ipq807x/base-files/etc/init.d/bootcount
+@@ -21,5 +21,15 @@ boot() {
+ 	netgear,wax630)
+ 		fw_setenv boot_count 0
+ 	;;
++	qnap,301w-ubootmod)
++		# End of boot reached: tell U-Boot this slot works, so its boot
++		# counter doesn't switch to the other slot.
++		. /lib/upgrade/common.sh
++		[ "$(rootfs_type)" = "tmpfs" ] && return 0
++		fw_setenv -s - <<-EOF
++			bootcount 0
++			boot_fallback 0
++		EOF
++	;;
+ 	esac
+ }
+diff --git a/target/linux/qualcommax/ipq807x/base-files/lib/upgrade/platform.sh b/target/linux/qualcommax/ipq807x/base-files/lib/upgrade/platform.sh
+index b9a25bc7b2..00cf463966 100644
+--- a/target/linux/qualcommax/ipq807x/base-files/lib/upgrade/platform.sh
++++ b/target/linux/qualcommax/ipq807x/base-files/lib/upgrade/platform.sh
+@@ -146,6 +146,55 @@ linksys_mx_pre_upgrade() {
+ 	fi
+ }
+ 
++# QNAP 301w in the OpenWrt U-Boot layout: two firmware slots (GPT fit_a and
++# fit_b) and one shared rootfs_data. Write the slot that isn't running, then
++# tell U-Boot to boot it. U-Boot verifies the slot before booting and falls
++# back to the other one if it doesn't come up (bootcount, bootlimit).
++qnap_301w_ab_upgrade() {
++	local current next
++
++	current="$(fw_printenv -n boot_slot 2>/dev/null)"
++	case "$current" in
++	a) next=b ;;
++	b) next=a ;;
++	*)
++		echo "boot_slot is '$current', expected a or b"
++		return 1
++		;;
++	esac
++
++	export EMMC_KERN_DEV="$(find_mmc_part "fit_$next")"
++	export EMMC_DATA_DEV="$(find_mmc_part rootfs_data)"
++	if [ -z "$EMMC_KERN_DEV" ] || [ -z "$EMMC_DATA_DEV" ]; then
++		echo "cannot find fit_$next or rootfs_data"
++		return 1
++	fi
++
++	echo "writing slot $next ($EMMC_KERN_DEV), running slot is $current"
++	emmc_do_upgrade "$1"
++	[ -n "$EMMC_KERNEL_BLOCKS" ] && [ "$EMMC_KERNEL_BLOCKS" -gt 0 ] || {
++		echo "writing slot $next failed"
++		return 1
++	}
++
++	# Settings: carry them over into the shared overlay, or start empty.
++	if [ -n "$UPGRADE_BACKUP" ]; then
++		emmc_copy_config
++	else
++		dd if=/dev/zero of="$EMMC_DATA_DEV" bs=512 count=8
++	fi
++	sync
++
++	# Switch only after the slot and the settings are in place.
++	fw_setenv -s - <<-EOF || return 1
++		boot_slot $next
++		bootcount 0
++		boot_fallback 0
++		upgrade_available 1
++	EOF
++	echo "slot $next is now active"
++}
++
+ platform_check_image() {
+ 	return 0;
+ }
+@@ -244,6 +293,9 @@ platform_do_upgrade() {
+ 		CI_ROOTPART="rootfs"
+ 		emmc_do_upgrade "$1"
+ 		;;
++	qnap,301w-ubootmod)
++		qnap_301w_ab_upgrade "$1"
++		;;
+ 	redmi,ax6|\
+ 	xiaomi,ax3600|\
+ 	xiaomi,ax9000)

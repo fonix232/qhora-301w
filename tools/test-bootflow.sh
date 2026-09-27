@@ -15,8 +15,12 @@ root=$(cd "$(dirname "$0")/.." && pwd)
 exec "$root/tools/build/run.sh" sh -eu -c '
 S=/work/build/u-boot-sandbox
 T=/work/build/bootflow
-if [ ! -x $S/u-boot ]; then
+if [ ! -x $S/u-boot ] || grep -q "^CONFIG_FIT_SIGNATURE=y" $S/.config; then
 	make -C src/u-boot O=$S sandbox_defconfig >/dev/null
+	# Mirror the 301w build: no FIT signature support, which is also what
+	# lets U-Boot accept the "config@hk01" node name the stock U-Boot needs.
+	src/u-boot/scripts/config --file $S/.config -d FIT_SIGNATURE -d SPL_FIT_SIGNATURE
+	make -C src/u-boot O=$S olddefconfig </dev/null >/dev/null
 	make -C src/u-boot O=$S -j"$(nproc)" NO_SDL=1 </dev/null >/work/build/sandbox-build.log 2>&1 ||
 		{ echo "sandbox build failed, see build/sandbox-build.log" >&2; tail -20 /work/build/sandbox-build.log >&2; exit 1; }
 fi
@@ -45,8 +49,8 @@ cat > slot.its <<EOF
 			hash-1 { algo = "sha1"; }; };
 	};
 	configurations {
-		default = "config-1";
-		config-1 { kernel = "kernel-1"; fdt = "fdt-1"; loadables = "rootfs-1"; };
+		default = "config@hk01";
+		config@hk01 { kernel = "kernel-1"; fdt = "fdt-1"; loadables = "rootfs-1"; };
 	};
 };
 EOF

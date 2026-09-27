@@ -1,4 +1,4 @@
-From 41979dd9f2105cd2351041eac59f1d08b3b26e64 Mon Sep 17 00:00:00 2001
+From 46863dfbd3e7d51676b9030b279426ae8ee324df Mon Sep 17 00:00:00 2001
 From: Jozsef Kiraly <fonix232@gmail.com>
 Date: Sun, 27 Sep 2026 05:07:28 +0100
 Subject: [PATCH 5/5] board: qnap: 301w: A/B boot flow with fallback and rescue
@@ -106,7 +106,7 @@ index 0000000000..3c601347ea
 +}
 diff --git a/board/qnap/301w/301w.env b/board/qnap/301w/301w.env
 new file mode 100644
-index 0000000000..458b2ceddf
+index 0000000000..4978e7442f
 --- /dev/null
 +++ b/board/qnap/301w/301w.env
 @@ -0,0 +1,66 @@
@@ -129,7 +129,7 @@ index 0000000000..458b2ceddf
 +bootlimit=3
 +upgrade_available=1
 +boot_slot=a
-+bootconf=config-1
++bootconf=config@hk01
 +loadaddr=0x44000000
 +ipaddr=192.168.1.1
 +serverip=192.168.1.254
