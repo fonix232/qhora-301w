@@ -1,11 +1,13 @@
 # U-Boot, the loader FIT and the APPSBL from upstream sources plus our patch
-# series, and every offline check (README "Offline checks"). Cheap: runs on
-# every push and pull request; openwrt.yml calls it for tagged releases.
+# series, and every offline check (README "Offline checks"; the same sequence
+# as tools/ci-checks.sh). Work is verified on mimir before it is pushed
+# (tools/build/remote-verify.sh), so this only runs for main, pull requests
+# and by hand; openwrt.yml calls it for tagged releases.
 name: ci
 
 on:
   push:
-    branches: ['**']
+    branches: [main]
   pull_request:
   workflow_dispatch:
   workflow_call:

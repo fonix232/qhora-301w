@@ -5,7 +5,8 @@
 # The image tag carries a checksum of the Dockerfile, so editing it builds a
 # new image instead of reusing a stale one. QH_IMAGE=<tag> uses a prebuilt
 # image instead (CI builds it with layer caching). SOURCE_DATE_EPOCH is passed
-# through for reproducible builds.
+# through for reproducible builds. QH_RUN_OPTS adds docker run options, e.g.
+# resource limits on a shared host (tools/build/remote-verify.sh).
 set -eu
 root=$(cd "$(dirname "$0")/../.." && pwd)
 image=${QH_IMAGE:-qhora-301w-build:$(cksum < "$root/tools/build/Dockerfile" | cut -d' ' -f1)}
@@ -23,5 +24,5 @@ if [ -n "${QH_VOLUME:-}" ] && ! docker volume inspect "$QH_VOLUME" >/dev/null 2>
 	docker volume create "$QH_VOLUME" >/dev/null
 	docker run --rm -v "$QH_VOLUME:/scratch" "$image" chmod 1777 /scratch
 fi
-exec docker run --rm -i $user ${SOURCE_DATE_EPOCH:+-e SOURCE_DATE_EPOCH} \
+exec docker run --rm -i $user ${QH_RUN_OPTS:-} ${SOURCE_DATE_EPOCH:+-e SOURCE_DATE_EPOCH} \
 	-v "$root:/work" ${QH_VOLUME:+-v "$QH_VOLUME:/scratch"} -w /work "$image" "$@"

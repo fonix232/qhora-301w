@@ -1,19 +1,13 @@
 # Full OpenWrt build (qualcommax/ipq807x, qnap_301w + qnap_301w-ubootmod)
-# from upstream sources plus patches/openwrt. Expensive, so it only runs when
-# the OpenWrt series or its build tooling changes, on v* tags and by hand.
-# A v* tag also runs ci.yml and publishes everything as a draft release.
+# from upstream sources plus patches/openwrt. Day-to-day OpenWrt builds run on
+# mimir before anything is pushed (tools/build/remote-verify.sh --openwrt), so
+# this only runs for v* tags, where it also runs ci.yml and publishes
+# everything as a draft release, and by hand.
 name: openwrt
 
 on:
   push:
-    branches: ['**']
-    tags: ['v*']          # path filters don't apply to tag pushes
-    paths:
-      - patches/openwrt/**
-      - tools/prepare-src.sh
-      - tools/build-openwrt.sh
-      - tools/openwrt/**
-      - .github/workflows/openwrt.yml
+    tags: ['v*']
   workflow_dispatch:
 
 permissions:

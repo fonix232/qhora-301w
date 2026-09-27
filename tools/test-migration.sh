@@ -18,7 +18,7 @@ T=build/migration
 cd "$root"
 rm -rf "$T" && mkdir -p "$T/backup/nor" "$T/backup/emmc"
 # the two 3.6 GiB disk images live on a Docker volume (sparse files work there)
-export QH_VOLUME=qhora-scratch
+export QH_VOLUME=${QH_VOLUME:-qhora-scratch}
 pass=0; fail=0
 ok() { pass=$((pass+1)); echo "PASS  $*"; }
 bad() { fail=$((fail+1)); echo "FAIL  $*"; }
