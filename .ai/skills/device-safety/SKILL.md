@@ -19,7 +19,8 @@ The device has two flash chips with very different failure costs. Know which one
 | R2 eMMC user area | writing `/dev/mmcblk0p*`, rewriting the GPT, `sysupgrade` | Needs: serial console attached and interruptible, verified full eMMC backup, a tested restore path, user's explicit go-ahead. |
 | R3 stock env | `fw_setenv`, U-Boot `setenv`+`saveenv` | Needs a backup of `0:appsblenv` (raw) and of `fw_printenv` output, a named variable list, user's go-ahead. Never erase the partition. Never touch QNAP inventory variables. |
 | R4 NOR data, non-boot | `0:ethphyfw1`, `0:ethphyfw2` (Aquantia firmware) | Allowed with backup + go-ahead; resolve by name, assert size `0x80000`. |
-| FORBIDDEN | any write/erase of `0:sbl1 0:mibib 0:qsee 0:devcfg 0:apdp 0:rpm 0:cdt 0:appsbl 0:art`; `sf erase/write/update` below `0x3B0000`; `kmod-mtd-rw`; eMMC `hwpartition complete`, RPMB keys, write-protect, `bootpart-resize`, any EXT_CSD write; writes to `mmcblk0boot0/1` or `mmcblk0rpmb` | Do not run. Do not propose. If a plan seems to need it, stop and escalate to the user. |
+| R5 APPSBL | replacing `0:appsbl` (`0x270000`, `0x100000`) with our U-Boot | Only in the APPSBL phase of `docs/design.md`, after all its gates are met (chainloaded U-Boot verified on the device, handoff format understood, 1.8 V programmer has read this unit's NOR back correctly, stock APPSBL backed up in three places) and with the user's explicit approval for that write. Bytes outside `0x270000`–`0x36FFFF` stay untouched. |
+| FORBIDDEN | any write/erase of `0:sbl1 0:mibib 0:qsee 0:devcfg 0:apdp 0:rpm 0:cdt 0:art`, and of `0:appsbl` outside R5; `sf erase/write/update` below `0x3B0000`; `kmod-mtd-rw`; eMMC `hwpartition complete`, RPMB keys, write-protect, `bootpart-resize`, any EXT_CSD write; writes to `mmcblk0boot0/1` or `mmcblk0rpmb` | Do not run. Do not propose. If a plan seems to need it, stop and escalate to the user. |
 
 ## Preflight checklist (R2 and above)
 

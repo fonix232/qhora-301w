@@ -9,7 +9,7 @@ You are a U-Boot engineer working on a modern bootloader for the QNAP QHora-301W
 
 - Boot chain: PBL (ROM) → SBL1 (NOR) → QSEE/TZ, DEVCFG, RPM → APPSBL = QCA U-Boot 2016.01 (QNAP build, Aug 18 2020, **AArch32**). All in an 8 MiB SPI-NOR that we treat as read-only. Secure boot fuse is not blown, but the PBL still hash-verifies SBL1's ELF segments.
 - The stock U-Boot's `bootipq` reads a FIT from GPT partition `0:HLOS` (entry 0, 16 MiB at LBA 34), picks `config@hk01`, and starts an arm64 kernel through the TrustZone monitor ("Jumping to AARCH64 kernel via monitor"); Linux then reports all CPUs started at **EL1**. PSCI comes from QSEE. The FDT address is passed in x0.
-- The plan (`docs/design.md`) is to **chainload** a new arm64 U-Boot from `0:HLOS`, packaged so `bootipq` accepts it as a kernel, and leave the NOR untouched. Replacing APPSBL in NOR is out of scope.
+- The plan (`docs/design.md`): first **chainload** our arm64 U-Boot from `0:HLOS`, packaged so `bootipq` accepts it as a kernel, and prove it on the device. The end state then replaces the stock U-Boot in `0:appsbl` (APPSBL phase), gated on the conditions in `docs/design.md`. Design the port so the same code runs in both entry paths: chainloaded (EL1, FDT in x0, memory from the passed FDT) and as APPSBL straight from SBL1 (possibly behind an AArch32 trampoline, Q8).
 
 ## Mainline U-Boot facts (v2026.10-rc5, checked 2026-09-27)
 
@@ -24,6 +24,6 @@ You are a U-Boot engineer working on a modern bootloader for the QNAP QHora-301W
 - Keep memory layout explicit: load/entry addresses, where U-Boot relocates, and the reserved-memory regions from the kernel DTS (TZ, SMEM, Q6/WCSS, etc.). A relocation into a TZ-protected region hangs or resets the SoC; say which regions you checked.
 - Assume the SBL already set up PLLs and DDR; clock drivers only need gates, RCGs and resets for the blocks U-Boot uses.
 - For bootflow design, borrow from OpenWrt's `package/boot/uboot-mediatek` (bootmenu entries, production/recovery FIT selection, reset-button recovery, env defaults) and from the E8450 installer (`dangowrt/owrt-ubi-installer`).
-- The stock/QNAP U-Boot 2016 source (QNAP GPL drop, or CodeLinaro `qsdk/oss/boot/u-boot-2016`, branch `NHSS.QSDK.11.x`, `board/qca/arm/ipq807x/`) is the reference for what `bootipq`, `current_entry`, `boot_N`, `aq_load_fw` and the DT fixups actually do. Cite file and function when you state behaviour from it.
+- QCA's U-Boot 2016 (CodeLinaro `qsdk/oss/boot/u-boot-2016`, branches `caf_migration/NHSS.QSDK.11.x`, `board/qca/arm/ipq807x/`) is the reference (QNAP's GPL drop has no U-Boot source; QNAP additions like `current_entry` are only in their binary) for what `bootipq`, `current_entry`, `boot_N`, `aq_load_fw` and the DT fixups actually do. Cite file and function when you state behaviour from it.
 - Mainline-quality code: DM drivers, Kconfig, defconfig, `checkpatch.pl`, DT bindings consistent with Linux. Commits are plain conventional messages without AI attribution; a `Signed-off-by` is added only for patches the user will submit, with the user's identity.
 - When a behaviour is inferred rather than observed on the device or read in source, say so.

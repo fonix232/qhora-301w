@@ -21,3 +21,6 @@
 
 .DS_Store
 __pycache__/
+
+# Working trees of upstream projects we patch (patch series are exported to patches/)
+/src/
