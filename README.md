@@ -6,7 +6,7 @@ Work in progress: the pieces below are tested offline; neither the eMMC conversi
 
 ## Principles
 
-- The Qualcomm boot chain in SPI-NOR (SBL1, QSEE, DEVCFG, APDP, RPM, CDT) and the ART calibration data are never written. Our U-Boot is first chainloaded from eMMC by the unmodified stock U-Boot, which stays the serial/TFTP safety net, and only replaces the stock one in `0:appsbl` once it has been proven that way. That replacement, and before it a copy of the stock U-Boot into empty NOR space plus a rewrite of the NOR partition table so that SBL1 can fall back to that copy, are the only planned NOR writes, each behind its own gates and the owner's go-ahead.
+- The Qualcomm boot chain in SPI-NOR (SBL1, QSEE, DEVCFG, APDP, RPM, CDT) and the ART calibration data are never written. Our U-Boot is first chainloaded from eMMC by the unmodified stock U-Boot, which stays the serial/TFTP safety net, and only replaces the stock one in `0:appsbl` once it has been proven that way. That replacement, and before it a copy of the stock U-Boot into empty NOR space (an on-device backup to restore from; SBL1 on this unit doesn't fall back to it) plus a rewrite of the NOR partition table that names it, are the only planned NOR writes, each behind its own gates and the owner's go-ahead.
 - No recovery partition: a slot that fails to verify or keeps crashing makes U-Boot boot the other slot, and with no bootable slot left (or the reset button held) it boots a recovery image from USB or over TFTP.
 - Everything is tried from RAM first (`tftpboot` + `bootm`), then against a disk image of a real backup, and only then on the device, with the owner's go-ahead for each write.
 - Backups are complete, verified and kept off the device.

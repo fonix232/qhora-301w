@@ -1,5 +1,5 @@
 {
- "description": "QHora-301W NOR layout v2 (docs/design.md, \"NOR layout v2\"): the stock table with every entry up to 0:ETHPHYFW unchanged, plus 0:ETHPHYFW2 (the second AQR113C firmware, already at 0x430000; image/padding split copied from 0:ETHPHYFW) and 0:APPSBL_1 (a copy of the stock APPSBL for SBL1's fallback), and reserved shrunk to the rest. Only the first 4 KiB of 0:MIBIB changes.",
+ "description": "QHora-301W NOR layout v2 (docs/design.md, \"NOR layout v2\"): the stock table with every entry up to 0:ETHPHYFW unchanged, plus 0:ETHPHYFW2 (the second AQR113C firmware, already at 0x430000; image/padding split copied from 0:ETHPHYFW) and 0:APPSBL_1 (an on-device backup copy of the stock APPSBL to restore from; SBL1 does not fall back to it on this unit, since the CDT's Boot Setting bit 0 is clear, docs/findings/0005), and reserved shrunk to the rest. Only the first 4 KiB of 0:MIBIB changes.",
  "block_size": "0x10000",
  "chip_size": "0x800000",
  "header": {
