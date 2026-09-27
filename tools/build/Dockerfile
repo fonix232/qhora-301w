@@ -3,7 +3,7 @@
 FROM debian:trixie
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        bc bison build-essential ca-certificates cpio device-tree-compiler \
+        bc bison build-essential ca-certificates cpio device-tree-compiler efitools \
         fdisk file flex gcc-arm-linux-gnueabihf gdisk git libgnutls28-dev libssl-dev \
         python3 python3-dev python3-libfdt python3-pyelftools python3-setuptools \
         swig u-boot-tools uuid-dev xxd \
