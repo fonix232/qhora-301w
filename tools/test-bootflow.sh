@@ -70,7 +70,11 @@ mkdisk() { # name, what goes in fit_a, what goes in fit_b  (slot|zero|badhash)
 		case $kind in
 		slot) dd if=slot.itb of=$img bs=512 seek=$lba conv=notrunc status=none ;;
 		badhash) dd if=slot.itb of=$img bs=512 seek=$lba conv=notrunc status=none
-			printf "\\377" | dd of=$img bs=1 seek=$((lba*512 + $(stat -c %s slot.itb) - 100)) conv=notrunc status=none ;;
+			# invert one byte of the (random) payload; writing a fixed value
+			# was a no-op whenever the byte already had it (1 run in 256)
+			off=$((lba*512 + $(stat -c %s slot.itb) - 100))
+			b=$(dd if=$img bs=1 skip=$off count=1 status=none | od -An -tu1 | tr -d " ")
+			printf "\\$(printf %o $((255 - b)))" | dd of=$img bs=1 seek=$off conv=notrunc status=none ;;
 		zero) ;;
 		esac
 	done
