@@ -25,6 +25,24 @@ A modern boot stack for the QNAP QHora-301W: a new U-Boot, a re-partitioned eMMC
 - `tools/mkloader.sh`: wraps the built U-Boot in the `config@hk01` FIT the stock U-Boot boots.
 - `tools/mkrecovery.sh`: recovery/backup image (official OpenWrt initramfs with a corrected device tree).
 - `tools/backup-live.sh`: read-only full backup over SSH, with verification and manifest.
-- `docs/procedures.md`: the device steps that are ready (backups, RAM-only chainload test).
+- `docs/procedures.md`: the device steps that are ready (backups, RAM-only chainload and APPSBL tests) and the drafted migration.
+- `patches/openwrt/`: the OpenWrt series (appsbl offset fix, DTS split, `qnap_301w-ubootmod` A/B variant).
+- `tools/mkappsbl.sh`, `tools/mkmbn.py`, `tools/appsbl/`: package our U-Boot as an APPSBL (AArch32 trampoline + MBN v3).
+- `tools/installer/`, `tools/mkbundle.sh`: the migration installer, its per-unit bundle, and the stock-U-Boot fallback script.
+- `tools/gpt.py`, `layouts/`: byte-exact GPT tables for the stock and v2 layouts.
+- `tools/analyze-boot.py`: boot-chain and NOR-dump analyser.
+
+## Offline checks
+
+Run these after changing anything they cover; none needs the device.
+
+| Check | Covers |
+|---|---|
+| `tools/test-bootflow.sh` | U-Boot A/B + fallback chain in the sandbox (9 scenarios) |
+| `tools/test-migration.sh` | installer on a full-size synthetic disk: conversion, refusals, power cut after every step, restore (28 checks) |
+| `tools/test-ab-upgrade.sh` | OpenWrt A/B sysupgrade logic (5 scenarios) |
+| `tools/test-stock-fallback.sh` | stock U-Boot level-1 fallback env script (7 checks) |
+| `tools/check-openwrt-dts.sh` | both OpenWrt 301w device trees compile, no new dtc warnings |
+| `python3 tools/mkmbn.py verify cache/vendor/nbg7815/*.mbn` | MBN hash-table generator against QCA's own images |
 - Agents in `.ai/agents/`: `safety-reviewer`, `uboot-engineer`, `kernel-engineer`, `openwrt-integrator`.
 - Skills in `.ai/skills/`: `device-safety`, `forum-sync`.

@@ -62,6 +62,10 @@ backups/             gitignored: device dumps (never commit)
 
 Codex has no agent directory; when a task matches one of the agents above, read its file in `.ai/agents/` and follow it as a role prompt.
 
+## Offline checks
+
+After changing U-Boot, the installer, the layout, the OpenWrt patches or the image tooling, re-run the matching check before committing; the table in `README.md` lists them (`tools/test-bootflow.sh`, `tools/test-migration.sh`, `tools/test-ab-upgrade.sh`, `tools/test-stock-fallback.sh`, `tools/check-openwrt-dts.sh`). Build everything through `tools/build/run.sh` (Docker/OrbStack); large disk images go on the `qhora-scratch` volume (`QH_VOLUME`), never on the macOS bind mount.
+
 ## Useful facts at a glance
 
 - Board compatible `qnap,301w`; OpenWrt device `qnap_301w` in `qualcommax/ipq807x`; DTS `target/linux/qualcommax/dts/ipq8072-301w.dts`.
