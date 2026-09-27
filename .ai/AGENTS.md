@@ -37,11 +37,16 @@ docs/hardware.md     device facts: boot chain, NOR map, eMMC GPT, env, serial
 docs/safety.md       safety model: what can brick, how each layer recovers
 docs/design.md       target architecture and phased plan
 docs/fit.md          FIT images: format, U-Boot/fitblk use, the FITs in this project
+docs/uboot-port.md   mainline U-Boot port: build, patches, subsystem status
+docs/procedures.md   step-by-step device procedures that are ready
 docs/open-questions.md  unknowns that block or shape the design
 docs/findings/       discrete findings (bugs, verified behaviours)
 docs/journal.md      dated research log
 docs/sources.md      references
-tools/               scripts (forum mirror; later backup/installer tooling)
+tools/               scripts: forum mirror, build container, loader/recovery images, backup
+patches/u-boot/      our mainline U-Boot patch series (base commit in BASE)
+src/                 gitignored working trees of patched upstreams (src/u-boot)
+build/               gitignored build outputs
 cache/               gitignored: forum mirror, upstream clones, vendor GPL drops
 backups/             gitignored: device dumps (never commit)
 ```

@@ -20,5 +20,11 @@ A modern boot stack for the QNAP QHora-301W: a new U-Boot, a re-partitioned eMMC
 ## Tooling
 
 - `tools/forum-sync.py`: mirrors the OpenWrt forum thread (topic 96934) into `cache/forum/` and prints new posts.
+- `tools/build/`: build container (Debian, native arm64 + armhf toolchains); `tools/build/run.sh <cmd>` runs a command in it with the repo at `/work`.
+- `patches/u-boot/`: our mainline U-Boot series (IPQ8074 clock + pinctrl, QHora-301W board); `docs/uboot-port.md` has build steps and status.
+- `tools/mkloader.sh`: wraps the built U-Boot in the `config@hk01` FIT the stock U-Boot boots.
+- `tools/mkrecovery.sh`: recovery/backup image (official OpenWrt initramfs with a corrected device tree).
+- `tools/backup-live.sh`: read-only full backup over SSH, with verification and manifest.
+- `docs/procedures.md`: the device steps that are ready (backups, RAM-only chainload test).
 - Agents in `.ai/agents/`: `safety-reviewer`, `uboot-engineer`, `kernel-engineer`, `openwrt-integrator`.
 - Skills in `.ai/skills/`: `device-safety`, `forum-sync`.
