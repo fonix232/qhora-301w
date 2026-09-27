@@ -67,7 +67,8 @@ cat slot-raw.itb > sysupgrade.itb; printf 'OPENWRT-METADATA-TRAILER' >> sysupgra
 tools/mkbundle.sh "$T/backup" build/loader/qnap_301w-uboot-loader.itb "$T/sysupgrade.itb" "$T/bundle" >/dev/null 2>"$T/mkbundle.err" ||
 	{ cat "$T/mkbundle.err"; exit 1; }
 cmp -s "$T/bundle/slot.itb" "$T/slot-raw.itb" && ok "bundle: metadata trailer stripped from the slot image" || bad "bundle: slot image not cut at the FIT end"
-tar -tf "$T/bundle/bootbackup.tar" | head -1 | grep -q '^appsbl.bin$' && ok "bundle: appsbl.bin is the first member of bootbackup" || bad "bundle: bootbackup order"
+[ "$(awk '{ print $2 }' "$T/bundle/manifest" | tr '\n' ' ')" = "gpt.primary.bin gpt.backup.bin layout loader.itb slot.itb stock-gpt-primary stock-gpt-backup " ] &&
+	ok "bundle: manifest covers exactly the expected files (no NOR data on the device)" || { bad "bundle manifest"; cat "$T/bundle/manifest"; }
 
 inst() { # extra env, args
 	c "cd /work/$T && cp --sparse=always stock.img disk.img 2>/dev/null; true" >/dev/null
@@ -86,16 +87,19 @@ echo "$out" | grep -q "converted to layout v2" && ok "conversion completes" || {
 v=$(c "sgdisk -v /work/$T/disk.img 2>&1" || true)
 echo "$v" | grep -q "No problems found" && ok "sgdisk: converted table is valid" || { bad "sgdisk verify"; echo "$v"; }
 c "cd /work/$T && sfdisk -d disk.img" > "$T/converted.sfdisk"
-for n in 0:HLOS ubootenv bootbackup fit_a fit_b data; do
+for n in 0:HLOS 0:HLOS_1 ubootenv ubootenv2 fit_a fit_b data; do
 	grep -q "name=\"$n\"" "$T/converted.sfdisk" || bad "partition $n missing after conversion"
 done
+# our U-Boot finds its two env copies by type GUID, in table order
+[ "$(grep -i 'type=3DE21764-95BD-54BD-A5C3-4ABE786F38A8' "$T/converted.sfdisk" | sed -n 's/.*name="\([^"]*\)".*/\1/p' | tr '\n' ' ')" = "ubootenv ubootenv2 " ] &&
+	ok "exactly ubootenv, ubootenv2 carry the U-Boot env type, in that order" || { bad "env partition types"; grep -i 3de21764 "$T/converted.sfdisk"; }
 cmpart() { # file, partition name
 	set -- "$1" "$2" $(awk -v n="$2" '$1 == n { print $2 }' "$T/bundle/layout")
 	c "cd /work/$T && n=\$(wc -c < $1) && dd if=disk.img bs=512 skip=$3 count=\$(( (n+511)/512 )) status=none | head -c \$n | cmp -s - $1"
 }
 cmpart bundle/loader.itb 0:HLOS && ok "0:HLOS holds the U-Boot loader" || bad "0:HLOS content"
+cmpart bundle/loader.itb 0:HLOS_1 && ok "0:HLOS_1 holds the second copy of the loader" || bad "0:HLOS_1 content"
 cmpart bundle/slot.itb fit_a && ok "fit_a holds the slot image" || bad "fit_a content"
-cmpart bundle/bootbackup.tar bootbackup && ok "bootbackup holds the stock boot data" || bad "bootbackup content"
 
 S=/work/build/u-boot-sandbox
 cp build/u-boot-301w/include/generated/env.in "$T/board.env"

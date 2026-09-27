@@ -1,4 +1,4 @@
-From ba83f7106e83d70bf05412468cc32ba2973cc741 Mon Sep 17 00:00:00 2001
+From 36512f4cc64190c74e4fe052574b3bb42f223df1 Mon Sep 17 00:00:00 2001
 From: Jozsef Kiraly <fonix232@gmail.com>
 Date: Sun, 27 Sep 2026 05:48:35 +0100
 Subject: [PATCH 6/9] clk: qcom: support GDSCs that report their state in GDSCR

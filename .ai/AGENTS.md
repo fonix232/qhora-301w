@@ -64,11 +64,12 @@ Codex has no agent directory; when a task matches one of the agents above, read 
 
 ## Offline checks
 
-After changing U-Boot, the installer, the layout, the OpenWrt patches or the image tooling, re-run the matching check before committing; the table in `README.md` lists them (`tools/test-bootflow.sh`, `tools/test-migration.sh`, `tools/test-ab-upgrade.sh`, `tools/test-stock-fallback.sh`, `tools/check-openwrt-dts.sh`). Build everything through `tools/build/run.sh` (Docker/OrbStack); large disk images go on the `qhora-scratch` volume (`QH_VOLUME`), never on the macOS bind mount.
+After changing U-Boot, the installer, the layout, the OpenWrt patches or the image tooling, re-run the matching check before committing; the table in `README.md` lists them (`tools/test-bootflow.sh`, `tools/test-migration.sh`, `tools/test-ab-upgrade.sh`, `tools/check-openwrt-dts.sh`). Build everything through `tools/build/run.sh` (Docker/OrbStack); large disk images go on the `qhora-scratch` volume (`QH_VOLUME`), never on the macOS bind mount.
 
 ## Useful facts at a glance
 
 - Board compatible `qnap,301w`; OpenWrt device `qnap_301w` in `qualcommax/ipq807x`; DTS `target/linux/qualcommax/dts/ipq8072-301w.dts`.
-- Stock bootloader: QCA U-Boot 2016.01 (built Aug 18 2020), AArch32, `bootcmd=bootipq`, `bootdelay=2`, serial 115200 8N1 3.3 V. It loads a FIT (`config@hk01`) from GPT partition `0:HLOS` (entry 0) and starts the kernel at EL1 through the TrustZone monitor.
+- Stock bootloader: QCA U-Boot 2016.01 (built Aug 18 2020), AArch32, `bootcmd=bootipq`, `bootdelay=2`, serial 115200 8N1 3.3 V. It loads a FIT (`config@hk01`) from GPT partition `0:HLOS` (entry 0) and starts the kernel at EL1 through the TrustZone monitor. If that load fails it marks `boot_0=bad`, switches to `0:HLOS_1`, saves its env and resets by itself; with `boot_0` and `boot_1` both bad it skips autoboot (`docs/findings/0004`). It honours no keypress at `bootdelay=0`, so `bootdelay` must never be lowered.
+- The stock U-Boot power-on write-protects any GPT partition with attribute bit 60 at every boot; `tools/gpt.py` refuses that bit.
 - Secure boot fuse is **not** blown (`is_sec_boot_enabled` → "secure boot fuse is not enabled", forum #24).
 - NOR part is a Winbond W25Q64DW: a **1.8 V** chip. A 3.3 V programmer will damage it.

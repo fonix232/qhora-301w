@@ -40,7 +40,11 @@ class Console:
         os.makedirs(os.path.join(ROOT, "logs"), exist_ok=True)
         self.log = open(os.path.join(ROOT, "logs", "serial-%s.log" % datetime.date.today().strftime("%Y%m%d")), "ab")
         self.s = serial.Serial(port, BAUD, timeout=0.1)  # DTR/RTS asserted: the bridge doesn't reset
-        # Activate the console ("Please press Enter") and drain whatever is pending.
+        # Ctrl-C discards a half-received line left by an earlier session (a
+        # lost character can leave the shell at a continuation prompt), then
+        # Enter activates the console ("Please press Enter"). Drain the echo.
+        self.s.write(b"\x03")
+        self._drain(0.3)
         self.s.write(b"\r")
         self._drain(1.0)
 

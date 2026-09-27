@@ -12,16 +12,29 @@ fw_printenv, uci show and similar reads. Nothing is written, nothing restarted.
 
 usage: tools/backup-serial.py [--port P] [--unit NAME] [--emmc-part NAME ...]
        tools/backup-serial.py --into backups/<unit>/<stamp>-serial --emmc-part NAME ...
+       tools/backup-serial.py --into backups/<unit>/<stamp>-serial --emmc-nc en8:lan4
 
 --emmc-part also fetches whole eMMC partitions by GPT name (slow: ~5 KB/s
 for data that doesn't compress). --into adds them to an existing backup
 instead of starting a new one (no info, NOR or GPT pass).
+
+--emmc-nc MAC_IF:ROUTER_IF streams the whole eMMC over a direct Ethernet
+link instead: the Mac listens on MAC_IF's IPv6 link-local address and the
+router, told over serial, runs `dd if=/dev/mmcblk0 | nc <addr>%ROUTER_IF`.
+Nothing is configured on the router. Use a router port without a DHCP
+server on it (the WAN port), so the Mac's routing isn't affected. The
+stream is hashed per partition on arrival and compared with hashes computed
+on the device; only mounted or loop-backed partitions may differ.
 """
 import argparse
 import datetime
 import hashlib
 import os
+import re
+import socket
+import subprocess
 import sys
+import threading
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -57,6 +70,7 @@ def main():
     ap.add_argument("--unit", default="301w")
     ap.add_argument("--emmc-part", action="append", default=[])
     ap.add_argument("--into")
+    ap.add_argument("--emmc-nc")
     args = ap.parse_args()
 
     con = Console(args.port)
@@ -151,9 +165,104 @@ def main():
         save("emmc/%s-%s.bin" % (dev, pname.replace(":", "_")), data)
         print("emmc: %s %s ok%s" % (dev, pname, " (live: changed while reading)" if sha(data) != whole else ""), file=sys.stderr)
 
+    if args.emmc_nc:
+        emmc_over_nc(con, out, args.emmc_nc)
+        for rel in ("emmc/mmcblk0.img.zst", "emmc/mmcblk0.img.sha256", "emmc/device-partitions.sha256"):
+            h = hashlib.sha256()
+            with open(os.path.join(out, rel), "rb") as f:
+                for block in iter(lambda: f.read(1 << 20), b""):
+                    h.update(block)
+            manifest.append((h.hexdigest(), rel))
+
     with open(os.path.join(out, "MANIFEST.sha256"), "a" if args.into else "w") as f:
         f.writelines("%s  %s\n" % m for m in manifest)
     print("done: %s" % out, file=sys.stderr)
+
+
+def emmc_over_nc(con, out, spec, port=9000):
+    mac_if, router_if = spec.split(":")
+    ifc = subprocess.run(["ifconfig", mac_if], capture_output=True, text=True).stdout
+    m = re.search(r"inet6 (fe80::[0-9a-f:]+)%" + re.escape(mac_if), ifc)
+    if not m:
+        sys.exit("%s has no IPv6 link-local address" % mac_if)
+    addr = m.group(1)
+    if con.check("cat /sys/class/net/%s/carrier" % router_if).strip() != "1":
+        sys.exit("router interface %s has no link" % router_if)
+    total = int(con.check("cat /sys/class/block/mmcblk0/size").strip()) * 512
+    parts = []
+    for line in open(os.path.join(out, "info/emmc-parts.txt")):
+        dev, name, start, size = line.split()
+        parts.append((int(start) * 512, (int(start) + int(size)) * 512, dev, name))
+
+    srv = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
+    srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    srv.bind((addr, port, 0, socket.if_nametoindex(mac_if)))  # only on the direct link
+    srv.listen(1)
+    srv.settimeout(60)
+    dst = os.path.join(out, "emmc/mmcblk0.img.zst")
+    result = {}
+
+    def receive():
+        try:
+            conn, peer = srv.accept()
+        except socket.timeout:
+            return
+        conn.settimeout(120)
+        zst = subprocess.Popen(["zstd", "-q", "-T0", "-10", "-f", "-o", dst], stdin=subprocess.PIPE)
+        whole = hashlib.sha256()
+        hashers = {dev: hashlib.sha256() for _, _, dev, _ in parts}
+        pos, t0, shown = 0, time.time(), 0
+        while True:
+            chunk = conn.recv(1 << 20)
+            if not chunk:
+                break
+            zst.stdin.write(chunk)
+            whole.update(chunk)
+            end = pos + len(chunk)
+            for a, b, dev, _ in parts:
+                lo, hi = max(a, pos), min(b, end)
+                if lo < hi:
+                    hashers[dev].update(chunk[lo - pos:hi - pos])
+            pos = end
+            if pos - shown >= 256 << 20:
+                shown = pos
+                print("  emmc %d/%d MiB (%.0f MiB/s)" % (pos >> 20, total >> 20, (pos >> 20) / max(time.time() - t0, 1)), file=sys.stderr)
+        zst.stdin.close()
+        zst.wait()
+        result.update(size=pos, whole=whole.hexdigest(), peer=peer[0],
+                      parts={d: h.hexdigest() for d, h in hashers.items()})
+
+    th = threading.Thread(target=receive)
+    th.start()
+    print("emmc: streaming to [%s]:%d via the router's %s" % (addr, port, router_if), file=sys.stderr)
+    rc, text = con.run("dd if=/dev/mmcblk0 bs=1M 2>/dev/null | nc %s%%%s %d" % (addr, router_if, port), timeout=3600)
+    th.join()
+    srv.close()
+    if result.get("size") != total:
+        sys.exit("eMMC stream: got %s bytes, expected %d (nc exit %d: %s)" % (result.get("size"), total, rc, text.strip()))
+    with open(os.path.join(out, "emmc/mmcblk0.img.sha256"), "w") as f:
+        f.write("%s  mmcblk0.img\n" % result["whole"])
+    print("emmc: %d MiB received from %s; hashing partitions on the device" % (total >> 20, result["peer"]), file=sys.stderr)
+
+    # Partitions the running system writes to may legitimately differ.
+    live = set(re.findall(r"/dev/(mmcblk0p\d+)", con.check(
+        "cat /proc/mounts; for l in /sys/block/loop*/loop/backing_file; do [ -f $l ] && cat $l; done")))
+    report, bad = [], []
+    for a, b, dev, name in parts:
+        dev_hash = con.check("sha256sum /dev/%s" % dev, timeout=1800).split()[0]
+        if dev_hash == result["parts"][dev]:
+            state = "ok"
+        elif dev in live:
+            state = "changed-live"
+        else:
+            state = "MISMATCH"
+            bad.append(dev)
+        report.append("%s %s %s %s" % (dev, name, dev_hash, state))
+        print("  %s %-12s %s" % (dev, name, state), file=sys.stderr)
+    with open(os.path.join(out, "emmc/device-partitions.sha256"), "w") as f:
+        f.write("\n".join(report) + "\n")
+    if bad:
+        sys.exit("eMMC partitions differ from the device: %s" % " ".join(bad))
 
 
 if __name__ == "__main__":

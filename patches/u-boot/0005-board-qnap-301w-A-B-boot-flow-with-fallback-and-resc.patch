@@ -1,4 +1,4 @@
-From 46863dfbd3e7d51676b9030b279426ae8ee324df Mon Sep 17 00:00:00 2001
+From b54334b4d465f30285cb2f4bf46a4cee6cd17966 Mon Sep 17 00:00:00 2001
 From: Jozsef Kiraly <fonix232@gmail.com>
 Date: Sun, 27 Sep 2026 05:07:28 +0100
 Subject: [PATCH 5/9] board: qnap: 301w: A/B boot flow with fallback and rescue
@@ -17,16 +17,20 @@ ft_system_setup() hook:
 - ft_system_setup() copies /chosen/rootdisk-<slot> to /chosen/rootdisk
   for the kernel's fitblk driver, like OpenWrt's MediaTek boards
 
-The environment lives in the ubootenv GPT partition, located through
-the device tree with CONFIG_ENV_MMC_USE_DT so that a missing partition
-disables saving instead of writing to a raw offset of the eMMC.
+The environment lives in the two GPT partitions typed as U-Boot
+environment (ubootenv, then ubootenv2: primary and redundant copy),
+found by type GUID. GPT support (EFI_PARTITION) is enabled explicitly:
+it is only a default with BOOT_DEFAULTS, and without it none of the
+named partitions are found. CONFIG_ENV_MMC_USE_DT makes a disk without
+env partitions disable saving instead of writing to a raw offset of the
+eMMC.
 ---
- arch/arm/dts/ipq8072-qnap-301w-u-boot.dtsi | 13 +++++
+ arch/arm/dts/ipq8072-qnap-301w-u-boot.dtsi | 11 ++++
  board/qnap/301w/301w.c                     | 44 +++++++++++++++
  board/qnap/301w/301w.env                   | 66 ++++++++++++++++++++++
  board/qnap/301w/MAINTAINERS                |  6 ++
  board/qnap/301w/Makefile                   |  3 +
- configs/qnap_301w_defconfig                | 15 +++++
+ configs/qnap_301w_defconfig                | 17 ++++++
  6 files changed, 147 insertions(+)
  create mode 100644 board/qnap/301w/301w.c
  create mode 100644 board/qnap/301w/301w.env
@@ -34,26 +38,24 @@ disables saving instead of writing to a raw offset of the eMMC.
  create mode 100644 board/qnap/301w/Makefile
 
 diff --git a/arch/arm/dts/ipq8072-qnap-301w-u-boot.dtsi b/arch/arm/dts/ipq8072-qnap-301w-u-boot.dtsi
-index caed012f9a..6b7fe19aac 100644
+index caed012f9a..0b89deb6cd 100644
 --- a/arch/arm/dts/ipq8072-qnap-301w-u-boot.dtsi
 +++ b/arch/arm/dts/ipq8072-qnap-301w-u-boot.dtsi
-@@ -12,3 +12,16 @@
+@@ -12,3 +12,14 @@
  	sdhci-caps-mask = <0x0 0x04000000>;
  	sdhci-caps = <0x0 0x04000000>;	/* SDHCI_CAN_VDD_180 */
  };
 +
-+/ {
-+	config {
-+		/*
-+		 * Environment lives in the "ubootenv" GPT partition (layout v2).
-+		 * With CONFIG_ENV_MMC_USE_DT and no u-boot,mmc-env-offset here,
-+		 * a missing partition makes env load/save fail instead of
-+		 * falling back to a raw offset on the eMMC: on the stock layout
-+		 * saveenv writes nothing.
-+		 */
-+		u-boot,mmc-env-partition = "ubootenv";
-+	};
-+};
++/*
++ * The environment lives in the GPT partitions typed as U-Boot environment
++ * (layout v2: ubootenv, then ubootenv2), found by type GUID with
++ * CONFIG_PARTITION_TYPE_GUID: the first holds the primary copy, the second
++ * the redundant one. There is deliberately no u-boot,mmc-env-partition:
++ * a name would put both copies in that one partition. With
++ * CONFIG_ENV_MMC_USE_DT and no u-boot,mmc-env-offset, a disk without such
++ * a partition makes env load/save fail instead of falling back to a raw
++ * offset on the eMMC: on the stock layout saveenv writes nothing.
++ */
 diff --git a/board/qnap/301w/301w.c b/board/qnap/301w/301w.c
 new file mode 100644
 index 0000000000..3c601347ea
@@ -198,7 +200,7 @@ index 0000000000..754213bf19
 +
 +obj-y += 301w.o
 diff --git a/configs/qnap_301w_defconfig b/configs/qnap_301w_defconfig
-index ca4c6b520e..14df0a23c3 100644
+index ca4c6b520e..a52b082133 100644
 --- a/configs/qnap_301w_defconfig
 +++ b/configs/qnap_301w_defconfig
 @@ -1,10 +1,16 @@
@@ -218,7 +220,7 @@ index ca4c6b520e..14df0a23c3 100644
  CONFIG_DEFAULT_DEVICE_TREE="ipq8072-qnap-301w"
  CONFIG_SYS_LOAD_ADDR=0x44000000
  CONFIG_DEBUG_UART_BASE=0x78b3000
-@@ -17,22 +23,30 @@ CONFIG_FIT=y
+@@ -17,22 +23,32 @@ CONFIG_FIT=y
  CONFIG_FIT_VERBOSE=y
  # CONFIG_BOOTSTD is not set
  CONFIG_OF_BOARD_SETUP=y
@@ -239,6 +241,8 @@ index ca4c6b520e..14df0a23c3 100644
  CONFIG_CMD_EXT4=y
  CONFIG_CMD_FAT=y
  CONFIG_CMD_FS_GENERIC=y
++CONFIG_EFI_PARTITION=y
++CONFIG_PARTITION_TYPE_GUID=y
  CONFIG_OF_LIVE=y
  # CONFIG_OF_UPSTREAM is not set
 +CONFIG_ENV_IS_IN_MMC=y
@@ -249,7 +253,7 @@ index ca4c6b520e..14df0a23c3 100644
  CONFIG_BUTTON=y
  CONFIG_BUTTON_GPIO=y
  CONFIG_CLK=y
-@@ -41,6 +55,7 @@ CONFIG_MSM_GPIO=y
+@@ -41,6 +57,7 @@ CONFIG_MSM_GPIO=y
  # CONFIG_I2C is not set
  # CONFIG_INPUT is not set
  CONFIG_LED=y

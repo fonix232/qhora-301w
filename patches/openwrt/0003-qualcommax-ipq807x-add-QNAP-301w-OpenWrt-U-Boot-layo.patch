@@ -1,4 +1,4 @@
-From 46c3de689bf82c6e294dc1951b8ad02b454e6838 Mon Sep 17 00:00:00 2001
+From e702afd5ce1007e19e751503e7a49985a3905893 Mon Sep 17 00:00:00 2001
 From: Jozsef Kiraly <fonix232@gmail.com>
 Date: Sun, 27 Sep 2026 05:21:58 +0100
 Subject: [PATCH 3/3] qualcommax: ipq807x: add QNAP 301w (OpenWrt U-Boot
@@ -10,8 +10,9 @@ stock one, later in place of it) and two firmware slots, each holding a
 FIT and, after it, that slot's own overlay:
 
   0:HLOS       4 MiB   U-Boot loader FIT (chainload stage)
-  ubootenv     1 MiB   U-Boot environment, two redundant copies
-  bootbackup   4 MiB   stock boot data, not touched by OpenWrt
+  0:HLOS_1     4 MiB   second copy of the loader (stock U-Boot fallback)
+  ubootenv     1 MiB   U-Boot environment, primary copy
+  ubootenv2    1 MiB   U-Boot environment, redundant copy
   fit_a      512 MiB   slot A: FIT (kernel, DTB, squashfs), then overlay
   fit_b      512 MiB   slot B
   data         rest    shared storage, not an overlay
@@ -28,7 +29,7 @@ and the bootcount init script marks a successful boot.
 Images use configuration config@hk01 so that the stock U-Boot can boot
 them too (recovery). Enable CONFIG_UIMAGE_FIT_BLK for the target.
 ---
- .../uboot-envtools/files/qualcommax_ipq807x   |  5 ++
+ .../uboot-envtools/files/qualcommax_ipq807x   |  6 +++
  target/linux/qualcommax/config-6.18           |  1 +
  .../qualcommax/dts/ipq8072-301w-ubootmod.dts  | 44 ++++++++++++++++
  target/linux/qualcommax/image/ipq807x.mk      | 20 +++++++
@@ -37,21 +38,22 @@ them too (recovery). Enable CONFIG_UIMAGE_FIT_BLK for the target.
  .../etc/hotplug.d/firmware/11-ath11k-caldata  |  1 +
  .../ipq807x/base-files/etc/init.d/bootcount   | 10 ++++
  .../base-files/lib/upgrade/platform.sh        | 52 +++++++++++++++++++
- 9 files changed, 137 insertions(+), 2 deletions(-)
+ 9 files changed, 138 insertions(+), 2 deletions(-)
  create mode 100644 target/linux/qualcommax/dts/ipq8072-301w-ubootmod.dts
 
 diff --git a/package/boot/uboot-tools/uboot-envtools/files/qualcommax_ipq807x b/package/boot/uboot-tools/uboot-envtools/files/qualcommax_ipq807x
-index 7c15a78c4f..3612c2af09 100644
+index 7c15a78c4f..463ae814c8 100644
 --- a/package/boot/uboot-tools/uboot-envtools/files/qualcommax_ipq807x
 +++ b/package/boot/uboot-tools/uboot-envtools/files/qualcommax_ipq807x
-@@ -39,6 +39,11 @@ asus,rt-ax89x|\
+@@ -39,6 +39,12 @@ asus,rt-ax89x|\
  qnap,301w)
  	ubootenv_add_mtd "0:appsblenv" "0x0" "0x20000" "0x20000"
  	;;
 +qnap,301w-ubootmod)
-+	# U-Boot keeps two redundant copies at the end of the partition
++	# U-Boot keeps the primary copy at the end of ubootenv and the
++	# redundant one at the end of ubootenv2 (found by partition type)
 +	ubootenv_add_mmc "ubootenv" "" "0xe0000" "0x20000" "0x20000"
-+	ubootenv_add_mmc "ubootenv" "" "0xc0000" "0x20000" "0x20000"
++	ubootenv_add_mmc "ubootenv2" "" "0xe0000" "0x20000" "0x20000"
 +	;;
  dynalink,dl-wrx36|\
  netgear,rax120v2|\

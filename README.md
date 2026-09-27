@@ -28,7 +28,8 @@ A modern boot stack for the QNAP QHora-301W: a new U-Boot, a re-partitioned eMMC
 - `docs/procedures.md`: the device steps that are ready (backups, RAM-only chainload and APPSBL tests) and the drafted migration.
 - `patches/openwrt/`: the OpenWrt series (appsbl offset fix, DTS split, `qnap_301w-ubootmod` A/B variant).
 - `tools/mkappsbl.sh`, `tools/mkmbn.py`, `tools/appsbl/`: package our U-Boot as an APPSBL (AArch32 trampoline + MBN v3).
-- `tools/installer/`, `tools/mkbundle.sh`: the migration installer, its per-unit bundle, and the stock-U-Boot fallback script.
+- `tools/installer/`, `tools/mkbundle.sh`: the migration installer and its per-unit bundle.
+- `tools/serial-run.py`, `tools/serialcon.py`, `tools/backup-serial.py`: shell and read-only backups over the serial console (NOR in chunks, whole eMMC over a direct Ethernet link with `--emmc-nc`), for a unit without network.
 - `tools/gpt.py`, `layouts/`: byte-exact GPT tables for the stock and v2 layouts.
 - `tools/analyze-boot.py`: boot-chain and NOR-dump analyser.
 - `tools/esp32s3-uart-bridge/`: PlatformIO firmware that turns a Waveshare ESP32-S3-Zero into a USB serial adapter that finds the RX pin and baud rate by itself.
@@ -39,10 +40,9 @@ Run these after changing anything they cover; none needs the device.
 
 | Check | Covers |
 |---|---|
-| `tools/test-bootflow.sh` | U-Boot A/B + fallback chain in the sandbox (9 scenarios) |
-| `tools/test-migration.sh` | installer on a full-size synthetic disk: conversion, refusals, power cut after every step, restore (28 checks) |
+| `tools/test-bootflow.sh` | U-Boot A/B + fallback chain in the sandbox (9 scenarios), plus the 301w build's GPT/env config (5 checks) |
+| `tools/test-migration.sh` | installer on a full-size synthetic disk: conversion, both loader copies, env partition types, refusals, power cut after every step, restore (29 checks) |
 | `tools/test-ab-upgrade.sh` | OpenWrt A/B sysupgrade logic (5 scenarios) |
-| `tools/test-stock-fallback.sh` | stock U-Boot level-1 fallback env script (7 checks) |
 | `tools/check-openwrt-dts.sh` | both OpenWrt 301w device trees compile, no new dtc warnings |
 | `python3 tools/mkmbn.py verify cache/vendor/nbg7815/*.mbn` | MBN hash-table generator against QCA's own images |
 | `tools/esp32s3-uart-bridge/README.md` (host test command) | serial bridge baud/pin detection against synthesised 8N1 (44 checks) |

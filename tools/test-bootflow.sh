@@ -114,6 +114,23 @@ run_case "level 4 twice -> rescue"            good      "setenv boot_fallback 1;
 run_case "control: button not held -> boot"   good      "gpio clear a3; run qh_boot"                    "^QH_BOOT slot=a"
 run_case "reset button held -> rescue first"  good      "gpio set a3; run qh_boot"                      "^QH_RESCUE"
 
+# The sandbox has its own config, so check the real 301w build for what the
+# flow needs from it: GPT (partitions by name), env partitions by type GUID,
+# and no raw-offset env fallback (finding 0002).
+C=/work/build/u-boot-301w/.config
+for opt in EFI_PARTITION PARTITION_TYPE_GUID ENV_MMC_USE_DT ENV_REDUNDANT; do
+	if grep -q "^CONFIG_$opt=y" $C; then pass=$((pass+1)); echo "PASS  301w config has $opt"
+	else fail=$((fail+1)); echo "FAIL  301w config lacks $opt"; fi
+done
+D=/work/build/u-boot-301w/arch/arm/dts/ipq8072-qnap-301w.dtb
+if ! fdtget -t s $D / model >/dev/null 2>&1; then
+	fail=$((fail+1)); echo "FAIL  cannot read $D with fdtget (control)"
+elif fdtget -t s $D /config u-boot,mmc-env-partition >/dev/null 2>&1 || fdtget $D /config u-boot,mmc-env-offset >/dev/null 2>&1; then
+	fail=$((fail+1)); echo "FAIL  301w DT names an env partition or raw offset (would put both copies in one place / allow raw writes)"
+else
+	pass=$((pass+1)); echo "PASS  301w DT has no env partition name or raw offset"
+fi
+
 echo "$pass passed, $fail failed"
 [ $fail -eq 0 ]
 '

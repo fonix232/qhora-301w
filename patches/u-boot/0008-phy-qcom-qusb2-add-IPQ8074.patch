@@ -1,4 +1,4 @@
-From 10ddf4742d4d2164c0b1f820d8023cf131226f50 Mon Sep 17 00:00:00 2001
+From c364ea6f85e0f4ca0b0b4d09386ed247736e8360 Mon Sep 17 00:00:00 2001
 From: Jozsef Kiraly <fonix232@gmail.com>
 Date: Sun, 27 Sep 2026 05:48:55 +0100
 Subject: [PATCH 8/9] phy: qcom: qusb2: add IPQ8074
