@@ -1,6 +1,6 @@
 # qhora-301w — agent instructions
 
-This repo is the working area for giving the **QNAP QHora-301W** (Qualcomm IPQ8072A, 8 MiB SPI-NOR + 4 GB eMMC) a modern boot stack: a new U-Boot, a re-partitioned eMMC that uses the whole flash, and an OpenWrt recovery/production split, in the spirit of what the Linksys E8450 / Belkin RT3200 got with its UBI layout. The overriding requirement is that the whole process is **100% safe and reversible** on a real device.
+This repo is the working area for giving the **QNAP QHora-301W** (Qualcomm IPQ8072A, 8 MiB SPI-NOR + 4 GB eMMC) a modern boot stack: a new U-Boot, a re-partitioned eMMC that uses the whole flash, and two OpenWrt firmware slots (A/B), each with its own settings, in the spirit of what the Linksys E8450 / Belkin RT3200 got with its UBI layout. The overriding requirement is that the whole process is **100% safe and reversible** on a real device.
 
 This file is the single source of truth for every AI tool. It is symlinked as `AGENTS.md`, `.claude/CLAUDE.md`, `.codex/AGENTS.md` and `.github/copilot-instructions.md`. Edit only `.ai/AGENTS.md`.
 
