@@ -74,6 +74,10 @@ jobs:
         if: ${{ !cancelled() && steps.uboot.outcome != 'skipped' }}
         run: tools/check-openwrt-dts.sh
 
+      - name: NOR partition table (MIBIB) tool and layouts
+        if: ${{ !cancelled() && steps.uboot.outcome != 'skipped' }}
+        run: tools/test-mibib.sh
+
       - name: MBN generator against QCA's images
         if: ${{ !cancelled() && steps.uboot.outcome != 'skipped' }}
         run: |
