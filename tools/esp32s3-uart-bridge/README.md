@@ -30,7 +30,7 @@ For other terminals, `pio device list` shows which port is the S3 (`VID:PID=303A
 2. The bridge prints `[uart-bridge] RX=GPIO7 TX=GPIO8 115200 8N1` (or whatever it found) and starts passing data both ways. It only prints `[uart-bridge]` lines when its state changes. While it is still listening, pressing any key prints the status (nothing is sent anywhere yet).
 3. The wiring and rate are remembered across power cycles, so a target that is already up and silent can be typed at straight away.
 
-LED: blue while listening (both pins released), green while bridging (TX driven). If green shows as red, build with `-DLED_ORDER=LED_COLOR_ORDER_GRB`.
+LED: blue while listening (both pins released), green while bridging (TX driven). The S3-Zero's LED is GRB; if another board shows red while bridging, build with `-DLED_ORDER=LED_COLOR_ORDER_RGB`.
 
 Press BOOT at any time to forget the wiring and listen again. Do this whenever you move the wires: with a remembered mapping the bridge drives the TX pin, and if that pin now goes to the target's TX the two outputs fight. A burst of framing errors (20 in 2 s) also makes it listen again, which covers a target that changes baud rate.
 

@@ -21,7 +21,7 @@
 #define LED_PIN 21  // WS2812 on the S3-Zero
 #endif
 #ifndef LED_ORDER
-#define LED_ORDER LED_COLOR_ORDER_RGB  // the S3-Zero's LED is RGB, not GRB
+#define LED_ORDER LED_COLOR_ORDER_GRB  // checked on hardware: green shows green
 #endif
 #ifndef BOOT_PIN
 #define BOOT_PIN 0
@@ -83,7 +83,7 @@ static bool armProbe(Probe &p) {
 static void startListening() {
   Serial1.end();
   for (auto &p : probes) {
-    pinMode(p.pin, INPUT);  // release the old TX line before anything else
+    pinMode(p.pin, INPUT_PULLUP);  // release the old TX line, keeping it high (no break)
     rmtInit(p.pin, RMT_RX_MODE, RMT_MEM_NUM_BLOCKS_2, RMT_HZ);
     rmtSetRxMaxThreshold(p.pin, IDLE_TICKS);
     rmtSetRxMinThreshold(p.pin, 3);  // ignore glitches under 0.3 us
