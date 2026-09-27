@@ -1,0 +1,26 @@
+{
+ "description": "QNAP QHora-301W stock SPI-NOR partition table (0:MIBIB at 0x050000), decoded from a unit's dump with tools/mibib.py; rebuilds that dump bit for bit (tools/test-mibib.sh). Offsets and sizes in bytes; attr is the system table's u32 (attr1 | attr2<<8 | attr3<<16 | which_flash<<24); pad is the user table's padding (image size = size - pad).",
+ "block_size": "0x10000",
+ "chip_size": "0x800000",
+ "header": {
+  "version": 4,
+  "age": 0
+ },
+ "table_version": 4,
+ "user_table_version": 4,
+ "crc_version": 1,
+ "partitions": [
+  {"name": "0:SBL1", "offset": "0x000000", "size": "0x050000", "attr": "0x0000ffff"},
+  {"name": "0:MIBIB", "offset": "0x050000", "size": "0x010000", "attr": "0x001040ff"},
+  {"name": "0:QSEE", "offset": "0x060000", "size": "0x180000", "attr": "0x0000ffff"},
+  {"name": "0:DEVCFG", "offset": "0x1e0000", "size": "0x010000", "attr": "0x0000ffff"},
+  {"name": "0:APDP", "offset": "0x1f0000", "size": "0x010000", "attr": "0x0000ffff"},
+  {"name": "0:RPM", "offset": "0x200000", "size": "0x040000", "attr": "0x0000ffff"},
+  {"name": "0:CDT", "offset": "0x240000", "size": "0x010000", "attr": "0x0000ffff"},
+  {"name": "0:APPSBLENV", "offset": "0x250000", "size": "0x020000", "attr": "0x0000ffff"},
+  {"name": "0:APPSBL", "offset": "0x270000", "size": "0x100000", "attr": "0x0000ffff"},
+  {"name": "0:ART", "offset": "0x370000", "size": "0x040000", "attr": "0x0000ffff"},
+  {"name": "0:ETHPHYFW", "offset": "0x3b0000", "size": "0x080000", "attr": "0x0000ffff", "pad": "0x040000"},
+  {"name": "reserved", "offset": "0x430000", "size": "0x3d0000", "attr": "0x0000ffff"}
+ ]
+}
