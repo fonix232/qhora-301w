@@ -87,9 +87,13 @@ echo "$out" | grep -q "converted to layout v2" && ok "conversion completes" || {
 v=$(c "sgdisk -v /work/$T/disk.img 2>&1" || true)
 echo "$v" | grep -q "No problems found" && ok "sgdisk: converted table is valid" || { bad "sgdisk verify"; echo "$v"; }
 c "cd /work/$T && sfdisk -d disk.img" > "$T/converted.sfdisk"
-for n in 0:HLOS 0:HLOS_1 ubootenv ubootenv2 fit_a fit_b data; do
+for n in 0:HLOS 0:HLOS_1 ubootenv ubootenv2 rootfs fit_a fit_b data; do
 	grep -q "name=\"$n\"" "$T/converted.sfdisk" || bad "partition $n missing after conversion"
 done
+# the stock U-Boot's bootipq looks these up by name before it loads anything
+# (findings 0004, 0006); without rootfs it stops at its prompt
+[ "$(for n in 0:HLOS 0:HLOS_1 rootfs; do grep -c "name=\"$n\"" "$T/converted.sfdisk"; done | tr '\n' ' ')" = "1 1 1 " ] &&
+	ok "the names the stock bootipq needs exist once each: 0:HLOS, 0:HLOS_1, rootfs" || bad "a name the stock bootipq needs is missing or duplicated"
 # our U-Boot finds its two env copies by type GUID, in table order
 [ "$(grep -i 'type=3DE21764-95BD-54BD-A5C3-4ABE786F38A8' "$T/converted.sfdisk" | sed -n 's/.*name="\([^"]*\)".*/\1/p' | tr '\n' ' ')" = "ubootenv ubootenv2 " ] &&
 	ok "exactly ubootenv, ubootenv2 carry the U-Boot env type, in that order" || { bad "env partition types"; grep -i 3de21764 "$T/converted.sfdisk"; }

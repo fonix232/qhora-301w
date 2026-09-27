@@ -90,7 +90,9 @@ else
 fi
 
 part() { awk -v n="$1" '$1 == n { print $2, $3 }' layout; }
-for name in 0:HLOS 0:HLOS_1 ubootenv ubootenv2 fit_a fit_b data; do
+# rootfs: the stock U-Boot's bootipq needs a GPT partition of that name, or it
+# stops at its prompt before loading 0:HLOS (docs/findings/0006)
+for name in 0:HLOS 0:HLOS_1 ubootenv ubootenv2 rootfs fit_a fit_b data; do
 	[ -n "$(part "$name")" ] || die "layout has no $name"
 done
 fits() { # file, partition name

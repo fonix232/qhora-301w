@@ -49,7 +49,7 @@ Run these after changing anything they cover; none needs the device.
 | Check | Covers |
 |---|---|
 | `tools/test-bootflow.sh` | U-Boot A/B + fallback chain in the sandbox (9 scenarios), plus the 301w build's GPT/env config (5 checks) |
-| `tools/test-migration.sh` | installer on a full-size synthetic disk: conversion, both loader copies, env partition types, refusals, power cut after every step, restore (29 checks) |
+| `tools/test-migration.sh` | installer on a full-size synthetic disk: conversion, both loader copies, the partition names the stock U-Boot needs, env partition types, refusals, power cut after every step, restore (30 checks) |
 | `tools/test-ab-upgrade.sh` | OpenWrt A/B sysupgrade logic (5 scenarios) |
 | `tools/check-openwrt-dts.sh` | both OpenWrt 301w device trees compile, no new dtc warnings |
 | `tools/test-mibib.sh` | NOR partition table tool: the stock table bit for bit, NOR layout v2 changes only the intended entries (21 checks, 26 with a backup set) |
