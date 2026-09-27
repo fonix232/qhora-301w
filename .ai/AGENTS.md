@@ -36,6 +36,7 @@ docs/status.md       current OpenWrt support level (forum + source)
 docs/hardware.md     device facts: boot chain, NOR map, eMMC GPT, env, serial
 docs/safety.md       safety model: what can brick, how each layer recovers
 docs/design.md       target architecture and phased plan
+docs/fit.md          FIT images: format, U-Boot/fitblk use, the FITs in this project
 docs/open-questions.md  unknowns that block or shape the design
 docs/findings/       discrete findings (bugs, verified behaviours)
 docs/journal.md      dated research log

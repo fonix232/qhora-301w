@@ -14,6 +14,7 @@ A modern boot stack for the QNAP QHora-301W: a new U-Boot, a re-partitioned eMMC
 - `docs/hardware.md`: boot chain, flash maps, environment, serial.
 - `docs/safety.md`: what can brick the device and how each layer is recovered.
 - `docs/design.md`: target architecture and phased plan; `docs/open-questions.md` for the unknowns.
+- `docs/fit.md`: what a FIT image is and how the stock U-Boot, our U-Boot and Linux (fitblk) use them.
 - `.ai/AGENTS.md`: rules and conventions for AI tools working in this repo (also linked as `AGENTS.md`, `.claude/CLAUDE.md`, `.codex/AGENTS.md`, `.github/copilot-instructions.md`).
 
 ## Tooling
