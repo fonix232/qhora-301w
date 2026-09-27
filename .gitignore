@@ -1,6 +1,6 @@
 # Device dumps: MACs, serial number, Wi-Fi calibration. Never commit.
 /backups/
-/logs/
+logs/
 
 # Downloads, upstream clones, vendor GPL drops, forum mirror
 /cache/

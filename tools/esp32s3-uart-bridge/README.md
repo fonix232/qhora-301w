@@ -20,7 +20,7 @@ If the board doesn't show up as a USB device, hold BOOT while plugging it in (or
 ## Use
 
 ```sh
-pio device monitor              # from this directory, raw passthrough, Enter sends CR
+pio device monitor              # from this directory: raw passthrough, Enter sends CR, logs to logs/
 screen /dev/cu.usbmodemXXXX 115200  # or any terminal; the USB-side baud rate is ignored
 ```
 
