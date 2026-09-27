@@ -1,0 +1,23 @@
+# Device dumps: MACs, serial number, Wi-Fi calibration. Never commit.
+/backups/
+/logs/
+
+# Downloads, upstream clones, vendor GPL drops, forum mirror
+/cache/
+
+# Build outputs and firmware blobs
+/build/
+/out/
+*.bin
+*.img
+*.itb
+*.mbn
+*.elf
+*.cld
+*.ubi
+*.gz
+*.xz
+*.zst
+
+.DS_Store
+__pycache__/

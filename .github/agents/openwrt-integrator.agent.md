@@ -1,0 +1,1 @@
+../../.ai/agents/openwrt-integrator.md
