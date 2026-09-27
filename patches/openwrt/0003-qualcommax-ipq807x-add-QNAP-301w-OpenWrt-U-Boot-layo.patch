@@ -13,6 +13,7 @@ FIT and, after it, that slot's own overlay:
   0:HLOS_1     4 MiB   second copy of the loader (stock U-Boot fallback)
   ubootenv     1 MiB   U-Boot environment, primary copy
   ubootenv2    1 MiB   U-Boot environment, redundant copy
+  rootfs       1 MiB   empty; the stock U-Boot's bootipq needs the name
   fit_a      512 MiB   slot A: FIT (kernel, DTB, squashfs), then overlay
   fit_b      512 MiB   slot B
   data         rest    shared storage, not an overlay
