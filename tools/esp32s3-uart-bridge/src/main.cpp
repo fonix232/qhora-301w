@@ -48,7 +48,6 @@ static int rxPin = -1, txPin = -1;
 static uint32_t baud = 0;
 static Preferences prefs;
 static std::atomic<uint32_t> frameErrors{0};
-static bool hostWasConnected = false, hintShown = false;
 
 static void led(uint8_t r, uint8_t g, uint8_t b) {
   rgbLedWriteOrdered(LED_PIN, LED_ORDER, r, g, b);
@@ -93,7 +92,6 @@ static void startListening() {
     armProbe(p);
   }
   state = LISTENING;
-  hintShown = false;
   led(0, 0, 16);
   banner();
 }
@@ -152,14 +150,17 @@ static void listen() {
     }
     armProbe(p);
   }
-  // Typing before the target has said anything can't go anywhere yet.
+  // Typing can't go anywhere before the target has said something, so answer
+  // with the status instead. The USB-Serial/JTAG port can't tell when a
+  // terminal opens it, so this is how a fresh terminal finds out the state.
+  static uint32_t lastHint = 0;
   if (Serial.available()) {
     while (Serial.available()) {
       Serial.read();
     }
-    if (!hintShown) {
-      note("not bridging yet: the target hasn't sent anything to detect. Reset or power it on.");
-      hintShown = true;
+    if (millis() - lastHint > 1000) {
+      banner();
+      lastHint = millis();
     }
   }
 }
@@ -220,11 +221,6 @@ void setup() {
 }
 
 void loop() {
-  bool connected = Serial;
-  if (connected && !hostWasConnected) {
-    banner();
-  }
-  hostWasConnected = connected;
   checkButton();
   if (state == LISTENING) {
     listen();
