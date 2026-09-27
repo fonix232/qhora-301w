@@ -30,6 +30,7 @@ A modern boot stack for the QNAP QHora-301W: a new U-Boot, a re-partitioned eMMC
 - `tools/mkappsbl.sh`, `tools/mkmbn.py`, `tools/appsbl/`: package our U-Boot as an APPSBL (AArch32 trampoline + MBN v3).
 - `tools/installer/`, `tools/mkbundle.sh`: the migration installer and its per-unit bundle.
 - `tools/serial-run.py`, `tools/serialcon.py`, `tools/backup-serial.py`: shell and read-only backups over the serial console (NOR in chunks, whole eMMC over a direct Ethernet link with `--emmc-nc`), for a unit without network.
+- `tools/uboot-nor-read.py`: reads a NOR range through the stock U-Boot (reboot, stop autoboot, `sf read`, `md.b`, `reset`) to fill what OpenWrt doesn't expose; `--backup` checks it against the Linux dumps and completes a backup set.
 - `tools/gpt.py`, `layouts/`: byte-exact GPT tables for the stock and v2 layouts.
 - `tools/analyze-boot.py`: boot-chain and NOR-dump analyser.
 - `tools/esp32s3-uart-bridge/`: PlatformIO firmware that turns a Waveshare ESP32-S3-Zero into a USB serial adapter that finds the RX pin and baud rate by itself.
