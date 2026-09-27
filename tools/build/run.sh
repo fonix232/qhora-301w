@@ -7,4 +7,6 @@ image=qhora-301w-build
 if ! docker image inspect "$image" >/dev/null 2>&1; then
 	docker build -t "$image" "$root/tools/build"
 fi
-exec docker run --rm -i -v "$root:/work" -w /work "$image" "$@"
+# QH_VOLUME=<name> also mounts a named Docker volume at /scratch (a Linux
+# filesystem: sparse files work there, unlike on the macOS bind mount).
+exec docker run --rm -i -v "$root:/work" ${QH_VOLUME:+-v "$QH_VOLUME:/scratch"} -w /work "$image" "$@"
