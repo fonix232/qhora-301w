@@ -64,12 +64,17 @@ Codex has no agent directory; when a task matches one of the agents above, read 
 
 ## Offline checks
 
-After changing U-Boot, the installer, the layout, the OpenWrt patches or the image tooling, re-run the matching check before committing; the table in `README.md` lists them (`tools/test-bootflow.sh`, `tools/test-migration.sh`, `tools/test-ab-upgrade.sh`, `tools/check-openwrt-dts.sh`). Build everything through `tools/build/run.sh` (Docker/OrbStack); large disk images go on the `qhora-scratch` volume (`QH_VOLUME`), never on the macOS bind mount.
+After changing U-Boot, the installer, the layout, the OpenWrt patches or the image tooling, re-run the matching check before committing; the table in `README.md` lists them (`tools/test-bootflow.sh`, `tools/test-migration.sh`, `tools/test-ab-upgrade.sh`, `tools/check-openwrt-dts.sh`, `tools/test-mibib.sh`), and `tools/ci-checks.sh` runs them all. Build everything through `tools/build/run.sh` (Docker/OrbStack); large disk images go on the `qhora-scratch` volume (`QH_VOLUME`), never on the macOS bind mount.
+
+**Verify on mimir before pushing.** Nothing goes to GitHub until `tools/build/remote-verify.sh` is green; it runs `tools/ci-checks.sh` on mimir in capped containers. Add `--openwrt` when `patches/openwrt/`, `tools/openwrt/`, `tools/build-openwrt.sh` or `tools/prepare-src.sh` changed; that runs the full OpenWrt build there (`tools/build/remote-openwrt.sh`, persistent tree). Build OpenWrt there, not on the Mac (the user wants it unloaded, and the macOS bind mount isn't case-sensitive) and not on freya (~3 GiB free while Lemonade's model is loaded, no swap). GitHub Actions only runs `ci.yml` for `main` and pull requests and the OpenWrt build for `v*` tags (README "CI").
 
 ## Useful facts at a glance
 
 - Board compatible `qnap,301w`; OpenWrt device `qnap_301w` in `qualcommax/ipq807x`; DTS `target/linux/qualcommax/dts/ipq8072-301w.dts`.
 - Stock bootloader: QCA U-Boot 2016.01 (built Aug 18 2020), AArch32, `bootcmd=bootipq`, `bootdelay=2`, serial 115200 8N1 3.3 V. It loads a FIT (`config@hk01`) from GPT partition `0:HLOS` (entry 0) and starts the kernel at EL1 through the TrustZone monitor. If that load fails it marks `boot_0=bad`, switches to `0:HLOS_1`, saves its env and resets by itself; with `boot_0` and `boot_1` both bad it skips autoboot (`docs/findings/0004`). It honours no keypress at `bootdelay=0`, so `bootdelay` must never be lowered.
 - The stock U-Boot power-on write-protects any GPT partition with attribute bit 60 at every boot; `tools/gpt.py` refuses that bit.
+- The stock `bootipq` needs GPT partitions named `0:HLOS`, `0:HLOS_1` **and `rootfs`**: it looks up `rootfs` on every boot, before `0:HLOS`, and stops at its prompt if it's missing (finding 0006). Layout v2 keeps a 1 MiB `rootfs` placeholder for that; never remove it while the stock U-Boot is the APPSBL. The installer refuses a layout without it.
+- SBL1 never falls back to `0:APPSBL_1` on this unit: the retry needs bit 0 of the CDT's "Boot Setting", which is `0x00000618` here (finding 0005). NOR layout v2's `0:APPSBL_1` is an on-device backup copy to restore from, not a fallback. SBL1 checks the MIBIB's header, both tables and a CRC-32, so any MIBIB change goes through `tools/mibib.py`.
+- The stock U-Boot is never modified. Our U-Boot is to find NOR partitions (e.g. `0:ETHPHYFW`/`0:ETHPHYFW2` for the AQR113C firmware) by name in the MIBIB copy SBL1 publishes in SMEM, never by fixed offsets (decided, not implemented yet; finding 0007).
 - Secure boot fuse is **not** blown (`is_sec_boot_enabled` → "secure boot fuse is not enabled", forum #24).
 - NOR part is a Winbond W25Q64DW: a **1.8 V** chip. A 3.3 V programmer will damage it.
