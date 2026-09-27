@@ -9,9 +9,10 @@
 # refused and never modified (it may hold work that isn't exported yet).
 #
 # The patches are applied with a fixed committer and the author date as the
-# commit date, and every file gets the mtime of the resulting HEAD, so the
-# same series always gives the same commit IDs (U-Boot's version string) and
-# a cached OpenWrt toolchain from an earlier build of it stays valid.
+# commit date, so the same series always gives the same commit IDs (U-Boot's
+# version string). Every file gets the base commit's mtime, which is older
+# than any build, so OpenWrt's stamps in a cached host-tools/toolchain build
+# of the same base stay newer than the sources and it isn't rebuilt.
 #
 # usage: tools/prepare-src.sh [u-boot|openwrt|all]    (default: all)
 set -eu
@@ -53,7 +54,7 @@ prepare() { # name, upstream URL, branch
 	GIT_COMMITTER_NAME="qhora-301w prepare-src" GIT_COMMITTER_EMAIL="prepare-src@invalid" \
 		git -C "$dir.tmp" am -q --committer-date-is-author-date "$series"/*.patch ||
 		die "the series in patches/$name does not apply to $base"
-	epoch=$(git -C "$dir.tmp" log -1 --format=%ct)
+	epoch=$(git -C "$dir.tmp" log -1 --format=%ct "$base")
 	(cd "$dir.tmp" && git ls-files -z) | python3 -c '
 import os, sys
 os.chdir(sys.argv[1])

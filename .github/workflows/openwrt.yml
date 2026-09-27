@@ -66,9 +66,18 @@ jobs:
           key: owrt-dl-${{ hashFiles('patches/openwrt/BASE') }}
           restore-keys: owrt-dl-
 
-      # Host tools and toolchain: only reused for exactly the same tree and
-      # config (prepare-src.sh gives every file the HEAD commit's mtime, so
-      # OpenWrt's stamps from the cached build stay newer and it skips them).
+      # Host tools and toolchain: keyed on the base commit, the config seed,
+      # prepare-src.sh and any patch that could change them; patches that only
+      # touch the kernel, packages or images (not cached) keep the cache valid.
+      # prepare-src.sh gives every file the base commit's mtime, so OpenWrt's
+      # stamps from the cached build stay newer and it skips both.
+      - name: Toolchain cache key
+        id: tckey
+        run: |
+          mapfile -t relevant < <(grep -l -E '^diff --git a/((tools|toolchain|include|scripts|config|target/linux/generic)/|(rules\.mk|Makefile) |target/linux/qualcommax/(Makefile|ipq807x/target\.mk) )' patches/openwrt/*.patch || true)
+          echo "patches affecting the toolchain: ${relevant[*]:-none}"
+          echo "hash=$(cat patches/openwrt/BASE tools/openwrt/diffconfig tools/prepare-src.sh "${relevant[@]}" | sha256sum | cut -c1-16)" >> "$GITHUB_OUTPUT"
+
       - name: Restore host tools + toolchain
         id: toolchain
         uses: actions/cache/restore@v4
@@ -76,7 +85,7 @@ jobs:
           path: |
             src/openwrt/staging_dir/host
             src/openwrt/staging_dir/toolchain-*
-          key: owrt-toolchain-${{ env.ImageOS }}-${{ runner.arch }}-${{ hashFiles('patches/openwrt/**', 'tools/openwrt/diffconfig', 'tools/prepare-src.sh') }}
+          key: owrt-toolchain-${{ env.ImageOS }}-${{ runner.arch }}-${{ steps.tckey.outputs.hash }}
 
       - name: Restore ccache
         uses: actions/cache/restore@v4
