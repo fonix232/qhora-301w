@@ -1,0 +1,49 @@
+# PlatformIO build of the ESP32-S3 serial bridge firmware (build only; its
+# host-side detection test runs in ci.yml).
+name: bridge
+
+on:
+  push:
+    branches: ['**']
+    paths:
+      - tools/esp32s3-uart-bridge/**
+      - .github/workflows/bridge.yml
+  pull_request:
+    paths:
+      - tools/esp32s3-uart-bridge/**
+      - .github/workflows/bridge.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  firmware:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.platformio
+          key: pio-${{ runner.os }}-${{ hashFiles('tools/esp32s3-uart-bridge/platformio.ini') }}
+
+      - run: pip install platformio
+
+      - run: pio run -d tools/esp32s3-uart-bridge
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: esp32s3-uart-bridge
+          path: |
+            tools/esp32s3-uart-bridge/.pio/build/esp32-s3-zero/firmware.bin
+            tools/esp32s3-uart-bridge/.pio/build/esp32-s3-zero/firmware.factory.bin
+            tools/esp32s3-uart-bridge/.pio/build/esp32-s3-zero/bootloader.bin
+            tools/esp32s3-uart-bridge/.pio/build/esp32-s3-zero/partitions.bin
+          if-no-files-found: error
+          retention-days: 14   # releases keep the long-term copies

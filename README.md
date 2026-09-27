@@ -49,3 +49,17 @@ Run these after changing anything they cover; none needs the device.
 | `tools/esp32s3-uart-bridge/README.md` (host test command) | serial bridge baud/pin detection against synthesised 8N1 (44 checks) |
 - Agents in `.ai/agents/`: `safety-reviewer`, `uboot-engineer`, `kernel-engineer`, `openwrt-integrator`.
 - Skills in `.ai/skills/`: `device-safety`, `forum-sync`.
+
+## CI
+
+GitHub Actions builds everything from upstream sources plus our patch series, so nothing has to be built on the Mac. The workflows only call scripts in `tools/`, which run the same way locally.
+
+| Workflow | Runs on | Does |
+|---|---|---|
+| `.github/workflows/ci.yml` | every push and pull request | `tools/prepare-src.sh` (recreates `src/u-boot` and `src/openwrt` from `BASE` + the series), `tools/build-uboot.sh`, `tools/mkloader.sh`, `tools/mkappsbl.sh`, then every offline check above. `mkmbn.py verify` gets QCA's images from `tools/fetch-vendor-mbn.sh` (pinned commit, sha256-checked, never committed). Artifact `u-boot`: `u-boot.bin`, the loader FIT, the APPSBL (`.mbn` and raw), `sha256sums` |
+| `.github/workflows/openwrt.yml` | changes to `patches/openwrt/`, `tools/openwrt/`, `tools/build-openwrt.sh`, `tools/prepare-src.sh` or the workflow; `v*` tags; manual dispatch | full build of `qualcommax/ipq807x` with `qnap_301w` and `qnap_301w-ubootmod` (`tools/build-openwrt.sh`, config seed `tools/openwrt/diffconfig`, upstream feeds); `dl/`, host tools + toolchain and ccache are cached between runs. Artifact `openwrt`: the 301w images, manifests, buildinfo, `sha256sums`. A `v*` tag also runs `ci.yml` and creates a draft release with both sets of files |
+| `.github/workflows/bridge.yml` | changes to `tools/esp32s3-uart-bridge/` | PlatformIO build of the bridge firmware |
+
+- U-Boot builds are reproducible: `SOURCE_DATE_EPOCH` is the patched tree's HEAD commit time and `prepare-src.sh` applies the series with a fixed committer, so a clean build gives the same `u-boot.bin` and loader FIT every time. The repo variable `QH_RUNNER=ubuntu-24.04-arm` runs `ci.yml` natively on arm64 and matches a Mac build bit for bit; on the default x86-64 runner U-Boot is cross-compiled with the same GCC and differs only by the compiler name it embeds.
+- `tools/build/run.sh` tags the container image with a checksum of the Dockerfile (edits rebuild it), takes a prebuilt image from `QH_IMAGE`, and on a Linux host runs as the calling user.
+- `tools/build-openwrt.sh` needs a Linux host with OpenWrt's build prerequisites and a case-sensitive filesystem: not the build container, not the macOS bind mount.

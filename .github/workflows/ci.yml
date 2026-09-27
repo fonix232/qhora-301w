@@ -1,0 +1,104 @@
+# U-Boot, the loader FIT and the APPSBL from upstream sources plus our patch
+# series, and every offline check (README "Offline checks"). Cheap: runs on
+# every push and pull request; openwrt.yml calls it for tagged releases.
+name: ci
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    # Repo variable QH_RUNNER=ubuntu-24.04-arm builds natively like the Mac
+    # does (bit-identical U-Boot); x86-64 cross-compiles, which only changes
+    # the compiler name U-Boot embeds.
+    runs-on: ${{ vars.QH_RUNNER || 'ubuntu-24.04' }}
+    timeout-minutes: 60
+    env:
+      QH_IMAGE: qhora-301w-build:ci
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build container
+        uses: docker/build-push-action@v6
+        with:
+          context: tools/build
+          tags: ${{ env.QH_IMAGE }}
+          load: true
+          cache-from: type=gha,scope=build-image-${{ runner.arch }}
+          cache-to: type=gha,mode=max,scope=build-image-${{ runner.arch }}
+
+      - name: Upstream sources + patch series
+        run: |
+          tools/prepare-src.sh all
+          echo "SOURCE_DATE_EPOCH=$(git -C src/u-boot log -1 --format=%ct)" >> "$GITHUB_ENV"
+
+      - name: U-Boot
+        id: uboot
+        run: tools/build-uboot.sh
+
+      - name: Loader FIT
+        id: loader
+        run: tools/mkloader.sh
+
+      - name: APPSBL
+        id: appsbl
+        run: tools/mkappsbl.sh
+
+      # Each check runs even if an earlier one failed, so one run shows them all.
+      - name: Boot flow (sandbox)
+        if: ${{ !cancelled() && steps.uboot.outcome == 'success' }}
+        run: tools/test-bootflow.sh
+
+      - name: Migration rehearsal
+        if: ${{ !cancelled() && steps.loader.outcome == 'success' }}
+        run: tools/test-migration.sh
+
+      - name: A/B sysupgrade logic
+        if: ${{ !cancelled() && steps.uboot.outcome != 'skipped' }}
+        run: tools/test-ab-upgrade.sh
+
+      - name: OpenWrt device trees
+        if: ${{ !cancelled() && steps.uboot.outcome != 'skipped' }}
+        run: tools/check-openwrt-dts.sh
+
+      - name: MBN generator against QCA's images
+        if: ${{ !cancelled() && steps.uboot.outcome != 'skipped' }}
+        run: |
+          tools/fetch-vendor-mbn.sh
+          python3 tools/mkmbn.py verify cache/vendor/nbg7815/*.mbn
+
+      - name: Serial bridge detection (host test)
+        if: ${{ !cancelled() && steps.uboot.outcome != 'skipped' }}
+        run: >-
+          tools/build/run.sh sh -c 'c++ -std=c++17 -O2 -I tools/esp32s3-uart-bridge/src
+          tools/esp32s3-uart-bridge/test/detect_test.cpp -o build/detect_test && build/detect_test'
+
+      - name: Collect artifacts
+        if: ${{ !cancelled() && steps.appsbl.outcome == 'success' }}
+        run: |
+          mkdir -p out
+          cp build/u-boot-301w/u-boot.bin out/qnap_301w-u-boot.bin
+          cp build/loader/qnap_301w-uboot-loader.itb build/appsbl/qnap_301w-appsbl.mbn build/appsbl/qnap_301w-appsbl-raw.bin out/
+          (cd out && sha256sum -- * > sha256sums)
+          { echo '```'; cat out/sha256sums; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() && steps.appsbl.outcome == 'success' }}
+        with:
+          name: u-boot
+          path: out/
+          if-no-files-found: error
+          retention-days: 14   # releases keep the long-term copies

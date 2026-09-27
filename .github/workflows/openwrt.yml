@@ -1,0 +1,174 @@
+# Full OpenWrt build (qualcommax/ipq807x, qnap_301w + qnap_301w-ubootmod)
+# from upstream sources plus patches/openwrt. Expensive, so it only runs when
+# the OpenWrt series or its build tooling changes, on v* tags and by hand.
+# A v* tag also runs ci.yml and publishes everything as a draft release.
+name: openwrt
+
+on:
+  push:
+    branches: ['**']
+    tags: ['v*']          # path filters don't apply to tag pushes
+    paths:
+      - patches/openwrt/**
+      - tools/prepare-src.sh
+      - tools/build-openwrt.sh
+      - tools/openwrt/**
+      - .github/workflows/openwrt.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    if: github.ref_type == 'tag'
+    uses: ./.github/workflows/ci.yml
+
+  openwrt:
+    needs: checks
+    if: ${{ !cancelled() && needs.checks.result != 'failure' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 350
+    env:
+      QH_CCACHE_DIR: ${{ github.workspace }}/.ccache
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup \
+            /opt/hostedtoolcache/CodeQL /usr/share/swift /usr/local/share/powershell \
+            /usr/local/share/chromium /opt/microsoft /opt/google /usr/lib/jvm
+          sudo docker image prune --all --force >/dev/null
+          df -h /
+
+      - name: Build prerequisites
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends build-essential clang flex bison g++ \
+            gawk gettext git libncurses-dev libssl-dev python3 python3-setuptools rsync swig unzip \
+            zlib1g-dev file wget zstd xz-utils bzip2 perl patch diffutils
+
+      - name: Upstream sources + patch series
+        run: tools/prepare-src.sh openwrt
+
+      # Source tarballs: keyed on the OpenWrt base commit; OpenWrt checks
+      # every file's hash itself, so an older set is a safe starting point.
+      - name: Restore dl/
+        id: dl
+        uses: actions/cache/restore@v4
+        with:
+          path: src/openwrt/dl
+          key: owrt-dl-${{ hashFiles('patches/openwrt/BASE') }}
+          restore-keys: owrt-dl-
+
+      # Host tools and toolchain: only reused for exactly the same tree and
+      # config (prepare-src.sh gives every file the HEAD commit's mtime, so
+      # OpenWrt's stamps from the cached build stay newer and it skips them).
+      - name: Restore host tools + toolchain
+        id: toolchain
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            src/openwrt/staging_dir/host
+            src/openwrt/staging_dir/toolchain-*
+          key: owrt-toolchain-${{ env.ImageOS }}-${{ runner.arch }}-${{ hashFiles('patches/openwrt/**', 'tools/openwrt/diffconfig', 'tools/prepare-src.sh') }}
+
+      - name: Restore ccache
+        uses: actions/cache/restore@v4
+        with:
+          path: .ccache
+          key: owrt-ccache-${{ runner.arch }}-${{ github.run_id }}
+          restore-keys: owrt-ccache-${{ runner.arch }}-
+
+      - name: Configure and download
+        run: |
+          mkdir -p .ccache && echo 'max_size = 3G' > .ccache/ccache.conf
+          tools/build-openwrt.sh download
+
+      - name: Build
+        id: build
+        run: tools/build-openwrt.sh build
+
+      # Saved even when the build fails, so a retry doesn't start from zero.
+      - name: Save dl/
+        if: ${{ !cancelled() && steps.dl.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v4
+        with:
+          path: src/openwrt/dl
+          key: ${{ steps.dl.outputs.cache-primary-key }}
+
+      - name: Check for a complete toolchain
+        id: toolchain-done
+        if: ${{ !cancelled() && steps.toolchain.outputs.cache-hit != 'true' }}
+        run: |
+          if ls src/openwrt/staging_dir/toolchain-*/stamp/.toolchain_compile >/dev/null 2>&1; then
+            echo "done=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Save host tools + toolchain
+        if: ${{ !cancelled() && steps.toolchain-done.outputs.done == 'true' }}
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            src/openwrt/staging_dir/host
+            src/openwrt/staging_dir/toolchain-*
+          key: ${{ steps.toolchain.outputs.cache-primary-key }}
+
+      - name: Save ccache
+        if: ${{ !cancelled() }}
+        uses: actions/cache/save@v4
+        with:
+          path: .ccache
+          key: owrt-ccache-${{ runner.arch }}-${{ github.run_id }}
+
+      - name: Collect artifacts
+        if: ${{ steps.build.outcome == 'success' }}
+        run: |
+          mkdir -p out
+          t=src/openwrt/bin/targets/qualcommax/ipq807x
+          cp $t/*301w* build/openwrt-diffconfig out/
+          cp $t/*.buildinfo $t/profiles.json out/ 2>/dev/null || true   # metadata, if generated
+          (cd out && sha256sum -- *301w* > sha256sums)
+          { echo '```'; cat out/sha256sums; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        if: ${{ steps.build.outcome == 'success' }}
+        with:
+          name: openwrt
+          path: out/
+          if-no-files-found: error
+          retention-days: 14   # releases keep the long-term copies
+
+  release:
+    if: github.ref_type == 'tag'
+    needs: [checks, openwrt]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+
+      - name: Draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir release
+          cp dist/u-boot/*.bin dist/u-boot/*.itb dist/u-boot/*.mbn release/
+          cp dist/openwrt/*301w* release/
+          (cd release && sha256sum -- * > sha256sums)
+          {
+            echo "Built by CI from ${GITHUB_SHA}: our U-Boot (u-boot.bin, the loader FIT for the stock U-Boot, the APPSBL) and OpenWrt for qnap_301w and qnap_301w-ubootmod."
+            echo
+            echo "Not tested on hardware by CI. Read docs/procedures.md before using anything here on a device."
+            echo
+            echo '```'; cat release/sha256sums; echo '```'
+          } > notes.md
+          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft --verify-tag \
+            --title "$GITHUB_REF_NAME" --notes-file notes.md release/*
