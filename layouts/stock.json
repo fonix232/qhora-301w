@@ -1,0 +1,17 @@
+{
+ "description": "QNAP QHora-301W stock eMMC GPT, from the stock U-Boot's `mmc part` (forum #20) and gdisk (#813). Partition GUIDs are identical on every unit; the disk GUID is per unit (take it from the unit's backup).",
+ "num_entries": 12,
+ "first_usable": 34,
+ "last_usable_from_end": 33,
+ "partitions": [
+  {"name": "0:HLOS",      "start": 34,      "end": 32801,   "type": "b51f2982-3ebe-46de-8721-ee641e1f9997", "guid": "1a373c3c-588e-eff4-5182-68ad83e0e62e"},
+  {"name": "0:HLOS_1",    "start": 32802,   "end": 65569,   "type": "a71da577-7f81-4626-b4a2-e377f9174525", "guid": "7d35f31d-0980-2220-edfd-6228595b79d2"},
+  {"name": "0:HLOS_2",    "start": 65570,   "end": 98337,   "type": "3e972198-336f-11ea-baa1-52540063a6b7", "guid": "964e7e67-6666-7303-312a-291b757640e8"},
+  {"name": "rootfs",      "start": 98338,   "end": 1146913, "type": "98d2248d-7140-449f-a954-39d67bd6c3b4", "guid": "2a213133-47f8-80a1-5d66-1d565a2ec756"},
+  {"name": "rootfs_1",    "start": 1146914, "end": 2195489, "type": "5647b280-dc2a-485d-9913-cf53ac40fa32", "guid": "77f91baf-6750-e138-dbe5-434eaeded6dd"},
+  {"name": "rootfs_2",    "start": 2195490, "end": 3244065, "type": "cd26dc90-3370-11ea-baa1-52540063a6b7", "guid": "8530d17c-21e3-f82b-12ec-87fd429a600e"},
+  {"name": "0:WIFIFW",    "start": 3244066, "end": 3252257, "type": "5911fd72-35be-424e-975d-69c957ad3a43", "guid": "9420c4b0-ba83-2b38-6ba6-2839be048c92"},
+  {"name": "reserved",    "start": 3252258, "end": 3285025, "type": "8da63339-0007-60c0-c436-083ac8230908", "guid": "e590e607-3410-795e-afbc-888e9b2ea17b"},
+  {"name": "rootfs_data", "start": 3285026, "end": 7591969, "type": "ab1760da-a8bb-4d6f-98d2-9ad3ab9009cd", "guid": "d1402149-3e8e-0709-99d9-170bfab2f66c"}
+ ]
+}

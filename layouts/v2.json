@@ -1,0 +1,13 @@
+{
+ "description": "QHora-301W layout v2 (docs/design.md, draft 3). 1 MiB aligned, standard 128-entry GPT. Partition GUIDs are generated per unit at install time.",
+ "num_entries": 128,
+ "align": 2048,
+ "partitions": [
+  {"name": "0:HLOS",      "start": 2048,   "end": 10239,  "type": "b51f2982-3ebe-46de-8721-ee641e1f9997"},
+  {"name": "ubootenv",    "start": 10240,  "end": 12287,  "type": "3de21764-95bd-54bd-a5c3-4abe786f38a8"},
+  {"name": "bootbackup",  "start": 12288,  "end": 20479,  "type": "0fc63daf-8483-4772-8e79-3d69d8477de4"},
+  {"name": "fit_a",       "start": 20480,  "end": 282623, "type": "0fc63daf-8483-4772-8e79-3d69d8477de4"},
+  {"name": "fit_b",       "start": 282624, "end": 544767, "type": "0fc63daf-8483-4772-8e79-3d69d8477de4"},
+  {"name": "rootfs_data", "start": 544768, "end": "last", "type": "0fc63daf-8483-4772-8e79-3d69d8477de4"}
+ ]
+}
