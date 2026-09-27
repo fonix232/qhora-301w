@@ -39,11 +39,18 @@ def protective_mbr(disk_sectors):
     return bytes(mbr)
 
 
+# The stock U-Boot power-on write-protects every partition with this attribute
+# bit at each boot (board_flash_protect(), CONFIG_FLASH_PROTECT in QCA's
+# u-boot-2016), which would make it unwritable until the next power cycle.
+READONLY_ATTR = 1 << 60
+
+
 def entries_blob(parts, num_entries):
     blob = bytearray(num_entries * ENTRY_SIZE)
     for i, p in enumerate(parts):
         name = p["name"].encode("utf-16-le")
         assert len(name) <= 72, p["name"]
+        assert not p.get("attrs", 0) & READONLY_ATTR, "%s: attribute bit 60 makes the stock U-Boot write-protect it" % p["name"]
         struct.pack_into("<16s16sQQQ72s", blob, i * ENTRY_SIZE,
                          guid_bytes(p["type"]), guid_bytes(p["guid"]),
                          p["start"], p["end"], p.get("attrs", 0), name)
@@ -114,7 +121,8 @@ def dump(data):
             continue
         n = name.decode("utf-16-le").rstrip("\0")
         print(f"{i + 1:3} {s:>9} {en:>9} {(en - s + 1) * SECTOR / 1048576:9.2f} MiB  "
-              f"{n:<14} type {guid_str(t)}  guid {guid_str(g)}")
+              f"{n:<14} type {guid_str(t)}  guid {guid_str(g)}"
+              + (f"  attrs {attrs:#x}" if attrs else ""))
 
 
 def main():
