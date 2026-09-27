@@ -14,15 +14,44 @@
 # than any build, so OpenWrt's stamps in a cached host-tools/toolchain build
 # of the same base stay newer than the sources and it isn't rebuilt.
 #
-# usage: tools/prepare-src.sh [u-boot|openwrt|all]    (default: all)
+# --update moves a tree this script made (HEAD is one of its commits, nothing
+# uncommitted) to the current BASE + series instead of refusing: the new
+# series is applied in a temporary worktree and then checked out, which
+# rewrites only the files that differ, so an incremental OpenWrt build redoes
+# only what changed. It still refuses a tree with anyone else's commits on top.
+#
+# usage: tools/prepare-src.sh [--update] [u-boot|openwrt|all]    (default: all)
 set -eu
 root=$(cd "$(dirname "$0")/.." && pwd)
+update=0
+[ "${1:-}" = --update ] && { update=1; shift; }
+committer="qhora-301w prepare-src"
 
 die() { echo "prepare-src: $*" >&2; exit 1; }
 
 # the patch-ids of a series, in order (independent of commit IDs and line offsets)
 series_ids() { for p in "$1"/*.patch; do git patch-id --stable < "$p" | cut -d' ' -f1; done; }
 tree_ids() { git -C "$1" format-patch --stdout "$2..HEAD" | git patch-id --stable | cut -d' ' -f1; }
+apply_series() { # git dir, series dir
+	GIT_COMMITTER_NAME="$committer" GIT_COMMITTER_EMAIL="prepare-src@invalid" \
+		git -C "$1" am -q --committer-date-is-author-date "$2"/*.patch
+}
+
+update_tree() { # (uses prepare's variables)
+	[ "$(git -C "$dir" log -1 --format=%cn)" = "$committer" ] ||
+		die "src/$name: HEAD is not a prepare-src commit (local work?); not updating it"
+	git -C "$dir" cat-file -e "$base^{commit}" 2>/dev/null || git -C "$dir" fetch -q --depth=1 origin "$base"
+	tmp=$dir.update
+	rm -rf "$tmp" && git -C "$dir" worktree prune
+	git -C "$dir" worktree add -q --detach "$tmp" "$base"
+	trap 'git -C "$dir" worktree remove --force "$tmp" 2>/dev/null; rm -rf "$tmp"' EXIT
+	apply_series "$tmp" "$series" || die "the series in patches/$name does not apply to $base"
+	new=$(git -C "$tmp" rev-parse HEAD)
+	git -C "$dir" worktree remove --force "$tmp"
+	trap - EXIT
+	git -C "$dir" checkout -q -B "$branch" "$new"
+	echo "src/$name: updated to $(git -C "$dir" log -1 --format='%h %s')"
+}
 
 prepare() { # name, upstream URL, branch
 	name=$1 url=$2 branch=$3
@@ -41,7 +70,8 @@ prepare() { # name, upstream URL, branch
 			echo "src/$name: up to date ($(git -C "$dir" log -1 --format='%h %s'))"
 			return
 		fi
-		die "src/$name is not $base + the $n patches in patches/$name (local work or an older series); move it aside to recreate it"
+		[ "$update" = 1 ] && { update_tree; return; }
+		die "src/$name is not $base + the $n patches in patches/$name (local work or an older series); move it aside to recreate it, or use --update if this script made it"
 	fi
 
 	echo "src/$name: fetching $url at $base"
@@ -51,9 +81,7 @@ prepare() { # name, upstream URL, branch
 	git -C "$dir.tmp" remote add origin "$url"
 	git -C "$dir.tmp" fetch -q --depth=1 origin "$base"
 	git -C "$dir.tmp" -c advice.detachedHead=false checkout -q -b "$branch" FETCH_HEAD
-	GIT_COMMITTER_NAME="qhora-301w prepare-src" GIT_COMMITTER_EMAIL="prepare-src@invalid" \
-		git -C "$dir.tmp" am -q --committer-date-is-author-date "$series"/*.patch ||
-		die "the series in patches/$name does not apply to $base"
+	apply_series "$dir.tmp" "$series" || die "the series in patches/$name does not apply to $base"
 	epoch=$(git -C "$dir.tmp" log -1 --format=%ct "$base")
 	(cd "$dir.tmp" && git ls-files -z) | python3 -c '
 import os, sys

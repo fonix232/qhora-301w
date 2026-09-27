@@ -9,13 +9,15 @@
 # filesystem, which the macOS bind mount isn't. CI runs it on the runner.
 #
 # QH_CCACHE_DIR=<dir> keeps ccache there (CI caches it between runs).
+# QH_JOBS=<n> overrides the make parallelism (default: nproc, which ignores
+# a container's CPU quota).
 # Images and sha256sums end up in src/openwrt/bin/targets/qualcommax/ipq807x/.
 #
 # usage: tools/build-openwrt.sh [config|download|build|all]   (default: all)
 set -eu
 root=$(cd "$(dirname "$0")/.." && pwd)
 cd "$root/src/openwrt" 2>/dev/null || { echo "no src/openwrt: run tools/prepare-src.sh openwrt" >&2; exit 1; }
-jobs=$(nproc)
+jobs=${QH_JOBS:-$(nproc)}
 
 configure() {
 	./scripts/feeds update -a

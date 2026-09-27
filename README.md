@@ -34,6 +34,7 @@ The project notes in `docs/` are kept out of this repository for now; the `docs/
 - `tools/backup-live.sh`: read-only full backup over SSH, with verification and manifest.
 - `docs/procedures.md`: the device steps that are ready (backups, RAM-only chainload and APPSBL tests) and the drafted migration.
 - `patches/openwrt/`: the OpenWrt series (appsbl offset fix, DTS split, `qnap_301w-ubootmod` A/B variant); `tools/build-openwrt.sh` builds both 301w profiles (Linux host only, see CI).
+- `tools/build/remote-openwrt.sh`: runs that OpenWrt build on a remote Docker host (default mimir) instead of the Mac, in a container capped at 12 CPUs and 10 GiB, with the tree, `dl/` and ccache kept in a volume there; `tools/prepare-src.sh --update` moves the tree to a changed series so only what changed is rebuilt. Images come back to `build/openwrt/`.
 - `tools/mkappsbl.sh`, `tools/mkmbn.py`, `tools/appsbl/`: package our U-Boot as an APPSBL (AArch32 trampoline + MBN v3).
 - `tools/installer/`, `tools/mkbundle.sh`: the migration installer and its per-unit bundle.
 - `tools/serial-run.py`, `tools/serialcon.py`, `tools/backup-serial.py`: shell and read-only backups over the serial console (NOR in chunks, whole eMMC over a direct Ethernet link with `--emmc-nc`), for a unit without network.
